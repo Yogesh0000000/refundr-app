@@ -1,538 +1,389 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Refundr | Automated Consumer Justice</title>
-  <style>
-    :root {
-      --bg: #0b0f19;
-      --card: #131c31;
-      --border: #1e293b;
-      --accent: #2563eb;
-      --accent-hover: #1d4ed8;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --success: #22c55e;
-      --danger: #ef4444;
-      --warning: #f59e0b;
-    }
-    * { box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      margin: 0;
-      padding: 0 0 3rem 0;
-    }
-    header {
-      background: var(--card);
-      border-bottom: 1px solid var(--border);
-      padding: 1rem 2rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .brand {
-      font-size: 19px;
-      font-weight: 800;
-      color: #38bdf8;
-      letter-spacing: -0.5px;
-    }
-    .badge-cpa {
-      background: rgba(34, 197, 94, 0.12);
-      color: var(--success);
-      border: 1px solid rgba(34, 197, 94, 0.3);
-      padding: 4px 12px;
-      border-radius: 999px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-    .container {
-      max-width: 860px;
-      margin: 2rem auto;
-      padding: 0 1.25rem;
-    }
-    .stepper {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 2rem;
-      position: relative;
-    }
-    .stepper::before {
-      content: "";
-      position: absolute;
-      top: 50%;
-      left: 10%;
-      right: 10%;
-      height: 2px;
-      background: var(--border);
-      transform: translateY(-50%);
-      z-index: 1;
-    }
-    .step-item {
-      position: relative;
-      z-index: 2;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-    }
-    .step-circle {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: var(--card);
-      border: 2px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 14px;
-      color: var(--muted);
-      transition: all 0.2s;
-    }
-    .step-item.active .step-circle {
-      border-color: #38bdf8;
-      background: #0284c7;
-      color: white;
-    }
-    .step-item.completed .step-circle {
-      border-color: var(--success);
-      background: rgba(34, 197, 94, 0.2);
-      color: var(--success);
-    }
-    .step-label {
-      font-size: 12px;
-      color: var(--muted);
-      font-weight: 600;
-    }
-    .step-item.active .step-label { color: #f8fafc; }
-
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.75rem;
-      margin-bottom: 2rem;
-    }
-    .step-title {
-      font-size: 18px;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
-    }
-    .step-desc {
-      color: var(--muted);
-      font-size: 13.5px;
-      margin-bottom: 1.5rem;
-    }
-    .form-group {
-      margin-bottom: 1.25rem;
-    }
-    label {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--muted);
-      display: block;
-      margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    input[type="text"], input[type="number"], select, textarea, input[type="file"] {
-      width: 100%;
-      background: var(--bg);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-      font-size: 14px;
-      outline: none;
-    }
-    textarea { height: 110px; resize: vertical; }
-    input:focus, select:focus, textarea:focus { border-color: #38bdf8; }
-
-    .btn-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      margin-top: 1.5rem;
-    }
-    .btn {
-      padding: 12px 20px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      border: none;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .btn-primary { background: var(--accent); color: white; }
-    .btn-primary:hover { background: var(--accent-hover); }
-    .btn-secondary { background: #1e293b; color: #cbd5e1; }
-    .btn-secondary:hover { background: #334155; }
-    .btn:disabled { background: #334155; cursor: not-allowed; }
-
-    .hidden { display: none; }
-    .banner {
-      border-radius: 10px;
-      padding: 1.25rem;
-      margin-bottom: 1.5rem;
-    }
-    .banner-warning {
-      background: rgba(245, 158, 11, 0.1);
-      border: 1px solid rgba(245, 158, 11, 0.4);
-    }
-    .banner-warning h3 { margin: 0 0 6px 0; color: var(--warning); font-size: 16px; }
-    .banner-warning ul { margin: 8px 0 0 0; padding-left: 20px; color: #fde68a; font-size: 14px; }
-    .banner-danger {
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.3);
-    }
-    .banner-danger h3 { margin: 0 0 6px 0; color: var(--danger); font-size: 16px; }
-    .banner-danger p { margin: 0; color: #fca5a5; font-size: 14px; }
-
-    .grid-stats {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin-bottom: 1.25rem;
-    }
-    .stat-box {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-      text-align: center;
-    }
-    .stat-box small { color: var(--muted); font-size: 10.5px; text-transform: uppercase; font-weight: bold; }
-    .stat-box .val { font-size: 20px; font-weight: 800; margin-top: 4px; color: #38bdf8; }
-    .stat-box.highlight .val { color: var(--success); }
-
-    .notice-wrapper {
-      background: #ffffff;
-      color: #0f172a;
-      border-radius: 8px;
-      padding: 1.5rem;
-      margin-bottom: 1rem;
-    }
-    .notice-header {
-      border-bottom: 2px solid #e2e8f0;
-      padding-bottom: 8px;
-      margin-bottom: 10px;
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      color: #475569;
-      font-weight: 700;
-    }
-    .notice-body {
-      font-family: Georgia, serif;
-      font-size: 13.5px;
-      line-height: 1.6;
-      white-space: pre-wrap;
-      max-height: 350px;
-      overflow-y: auto;
-      color: #1e293b;
-    }
-    .btn-pdf {
-      background: #0284c7;
-      color: white;
-      padding: 12px;
-      font-weight: 600;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      width: 100%;
-    }
-    .btn-pdf:hover { background: #0369a1; }
-
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th { background: var(--bg); color: var(--muted); font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: left; }
-    td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: #cbd5e1; }
-    .link-dl { color: #38bdf8; text-decoration: none; font-weight: 600; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Refundr - Automated Consumer Legal Redressal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-black text-white text-base">R</div>
+                <div>
+                    <span class="text-lg font-bold tracking-tight">Refundr</span>
+                    <span class="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">CCPA & NCH Verified</span>
+                </div>
+            </div>
+            <div id="auth-nav-box" class="flex items-center space-x-3">
+                <button onclick="openAuthModal()" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl font-semibold transition">
+                    Sign In / Register
+                </button>
+            </div>
+        </div>
+    </header>
 
-  <header>
-    <div class="brand">⚖️ REFUNDR</div>
-    <div class="badge-cpa">Consumer Protection Act, 2019 Ready</div>
-  </header>
+    <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+        <!-- Top Metrics Cards -->
+        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+                <p class="text-xs text-slate-400">Total Money Recovered</p>
+                <p id="metric-recovered" class="text-2xl font-black text-emerald-400 mt-1">₹0</p>
+                <p class="text-[10px] text-slate-500 mt-1">Disbursed via Direct UPI</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+                <p class="text-xs text-slate-400">Claims in Active Dispute</p>
+                <p id="metric-active" class="text-2xl font-black text-amber-400 mt-1">0</p>
+                <p class="text-[10px] text-slate-500 mt-1">Under 7-Day Cure Window</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+                <p class="text-xs text-slate-400">Platform Recovery Split</p>
+                <p class="text-2xl font-black text-indigo-400 mt-1">95% / 5%</p>
+                <p class="text-[10px] text-slate-500 mt-1">No upfront lawyer fees</p>
+            </div>
+        </section>
 
-  <div class="container">
-    <div class="stepper">
-      <div class="step-item active" id="stepIndicator1">
-        <div class="step-circle">1</div>
-        <div class="step-label">Merchant & Category</div>
-      </div>
-      <div class="step-item" id="stepIndicator2">
-        <div class="step-circle">2</div>
-        <div class="step-label">Evidence & Facts</div>
-      </div>
-      <div class="step-item" id="stepIndicator3">
-        <div class="step-circle">3</div>
-        <div class="step-label">Verification & Notice</div>
-      </div>
+        <!-- Filing Intake Workspace -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h2 class="text-sm font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-file-shield text-indigo-400"></i>
+                        <span>File New Dispute & Statutory Demand Notice</span>
+                    </h2>
+                    <span id="convergence-badge" class="hidden text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        ✓ NCH Convergence Partner
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                        <label class="text-slate-400 font-medium">Opposite Party (Company / Airline / Brand)</label>
+                        <input id="disp-respondent" oninput="checkNCHConvergence()" type="text" placeholder="e.g. IndiGo, Flipkart, Airtel, Swiggy" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
+                    </div>
+                    <div>
+                        <label class="text-slate-400 font-medium">Claim Category</label>
+                        <select id="disp-category" onchange="updateCalculations()" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
+                            <option value="Aviation / Flight Delay">Flight Delay (DGCA 3h+ CAR Rules)</option>
+                            <option value="Train / IRCTC TDR">Train Delay / IRCTC TDR</option>
+                            <option value="Telecom / Broadband Outage">Telecom / Broadband Outage (TRAI QoS)</option>
+                            <option value="E-Commerce Defective Return">E-Commerce Defective / Return Refusal</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                        <label class="text-slate-400 font-medium">Date of Incident</label>
+                        <input id="disp-date" onchange="updateCalculations()" type="date" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
+                    </div>
+                    <div>
+                        <label class="text-slate-400 font-medium">Verified Invoice / Ticket Amount (INR)</label>
+                        <input id="disp-amount" oninput="updateCalculations()" type="number" placeholder="3499" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
+                    </div>
+                </div>
+
+                <!-- CCPA Module -->
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
+                    <div class="flex items-center justify-between">
+                        <label class="font-bold text-amber-400 flex items-center space-x-1">
+                            <i class="fa-solid fa-eye-slash"></i>
+                            <span>CCPA Dark Pattern Auditor</span>
+                        </label>
+                        <input id="dark-pattern-toggle" type="checkbox" onchange="toggleDarkPatternSelect()" class="rounded border-slate-700 bg-slate-900 text-indigo-600">
+                    </div>
+                    <p class="text-[11px] text-slate-400">Did the merchant use deceptive checkout tactics, drip pricing, or forced add-ons?</p>
+                    <select id="dark-pattern-type" class="hidden mt-2 w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 text-xs">
+                        <option value="Drip Pricing (Hidden checkout additions)">Drip Pricing (Hidden fees added at payment)</option>
+                        <option value="Basket Sneaking (Unsolicited opt-ins)">Basket Sneaking (Unsolicited insurance/donation)</option>
+                        <option value="Subscription Trap (Impossible cancellation)">Subscription Trap (Buried cancellation)</option>
+                    </select>
+                </div>
+
+                <div class="text-xs">
+                    <label class="text-slate-400 font-medium">Deficiency Narrative</label>
+                    <textarea id="disp-narrative" rows="2" placeholder="Summary of service failure, PNR/Order ID..." class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"></textarea>
+                </div>
+
+                <div class="flex items-start space-x-2 bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-400">
+                    <input id="clean-hands-check" type="checkbox" class="mt-0.5">
+                    <label for="clean-hands-check"><b>Clean-Hands:</b> No prior voucher or settlement has been accepted.</label>
+                </div>
+
+                <!-- Financial Breakdown -->
+                <div class="bg-indigo-950/30 border border-indigo-500/20 p-4 rounded-xl text-xs space-y-1 font-mono">
+                    <div class="flex justify-between text-slate-300"><span>Principal Loss:</span><span id="calc-principal">₹0.00</span></div>
+                    <div class="flex justify-between text-slate-300"><span>Statutory Delay Penalty:</span><span id="calc-statutory">₹7,500.00</span></div>
+                    <div class="flex justify-between text-amber-400"><span>Accrued Interest (12% p.a.):</span><span id="calc-interest">₹0.00</span></div>
+                    <div class="flex justify-between text-slate-300"><span>Notice Preparation Expense:</span><span>₹1,500.00</span></div>
+                    <div class="flex justify-between font-bold text-emerald-400 border-t border-indigo-500/30 pt-1 text-sm">
+                        <span>Total Statutory Demand:</span><span id="calc-total">₹9,000.00</span>
+                    </div>
+                    <div class="flex justify-between text-[11px] text-slate-400 pt-1">
+                        <span>User Payout (95%): <b class="text-emerald-300" id="calc-payout">₹8,550.00</b></span>
+                        <span>Platform Fee (5%): <span id="calc-fee">₹450.00</span></span>
+                    </div>
+                </div>
+
+                <button onclick="submitDispute()" id="file-dispute-btn" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-white text-xs transition shadow-lg shadow-indigo-600/30">
+                    Generate Statutory 7-Day Demand Notice
+                </button>
+            </div>
+
+            <!-- Hardware Stamping -->
+            <div class="space-y-4">
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
+                    <h3 class="text-xs font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-location-crosshairs text-blue-400"></i>
+                        <span>GPS Station Delay Stamping</span>
+                    </h3>
+                    <div id="gps-log" class="text-[10px] bg-slate-950 p-2.5 rounded-xl border border-slate-800 font-mono text-slate-300">GPS sensor idle.</div>
+                    <button onclick="stampGPS()" class="w-full py-2 bg-blue-600/20 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-semibold">Verify Location Telemetry</button>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
+                    <h3 class="text-xs font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-wifi text-purple-400"></i>
+                        <span>Network Outage Diagnostic</span>
+                    </h3>
+                    <div id="network-log" class="text-[10px] bg-slate-950 p-2.5 rounded-xl border border-slate-800 font-mono text-slate-300">Diagnostics ready.</div>
+                    <button onclick="stampNetwork()" class="w-full py-2 bg-purple-600/20 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-semibold">Run Latency Diagnostic</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Active Dockets with Apology Delivery Display -->
+        <section class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+            <h2 class="text-sm font-bold text-white flex items-center space-x-2">
+                <i class="fa-solid fa-list-check text-emerald-400"></i>
+                <span>Active Dispute Dockets & Escalation Stepper</span>
+            </h2>
+            <div id="cases-container" class="space-y-4">
+                <div class="text-xs text-slate-400 p-6 text-center border border-dashed border-slate-800 rounded-xl">No active claims found.</div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Registration Modal -->
+    <div id="auth-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 w-full max-w-md p-6 rounded-2xl space-y-4">
+            <h3 class="font-bold text-white text-sm">Consumer Identity Registration</h3>
+            <div class="space-y-3 text-xs">
+                <input id="auth-name" type="text" placeholder="Full Legal Name" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
+                <input id="auth-email" type="email" placeholder="Email Address" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
+                <div class="grid grid-cols-2 gap-2">
+                    <input id="auth-phone" type="text" placeholder="Mobile Number" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
+                    <input id="auth-pincode" type="text" placeholder="Pincode" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
+                </div>
+                <input id="auth-upi" type="text" placeholder="Payout UPI ID (e.g. name@oksbi)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
+            </div>
+            <button onclick="submitAuth()" class="w-full py-2.5 bg-indigo-600 font-bold rounded-xl text-xs text-white">Save Profile & Begin</button>
+        </div>
     </div>
 
-    <!-- STEP 1 -->
-    <div class="card" id="step1">
-      <div class="step-title">Step 1: Identify Merchant & Incident</div>
-      <div class="step-desc">Select the category of deficiency and specify the business entity involved.</div>
-      
-      <div class="form-group">
-        <label for="merchantCategory">Dispute Category</label>
-        <select id="merchantCategory">
-          <option value="Airlines & Travel">Airlines & Travel (Cancellations, Denied Boarding)</option>
-          <option value="Hospitality & Restaurants">Hospitality & Dining (Mandatory Service Charge)</option>
-          <option value="E-Commerce & Retail">E-Commerce & Retail (Defective Goods, Fake Returns)</option>
-          <option value="Entertainment & Cinemas">Entertainment & Multiplexes (Delayed Entry, Screen Issues)</option>
-          <option value="Banking & FinTech">Banking & Digital Wallets (Unauthorized Debits)</option>
-          <option value="Other Deficiency">Other Deficiency in Service</option>
-        </select>
-      </div>
+    <script>
+        let currentUser = JSON.parse(localStorage.getItem("refundr_user")) || null;
+        let gpsData = null;
+        let networkData = null;
 
-      <div class="form-group">
-        <label for="merchantName">Merchant / Business Name</label>
-        <input type="text" id="merchantName" placeholder="e.g. IndiGo, PVR Cinemas, Swiggy, Apple India" />
-      </div>
+        const convergenceList = ["indigo", "air india", "spicejet", "vistara", "irctc", "amazon", "flipkart", "myntra", "swiggy", "zomato", "airtel", "jio", "vodafone idea", "tata play", "makemytrip"];
 
-      <div class="btn-row" style="justify-content: flex-end;">
-        <button class="btn btn-primary" onclick="goToStep(2)">Next: Attach Evidence & Loss →</button>
-      </div>
-    </div>
+        document.getElementById("disp-date").value = new Date().toISOString().split('T')[0];
 
-    <!-- STEP 2 -->
-    <div class="card hidden" id="step2">
-      <div class="step-title">Step 2: Substantiate Financial Loss</div>
-      <div class="step-desc">Enter the verified loss amount and attach proof to make the claim enforceable.</div>
-
-      <div class="form-group">
-        <label for="lossAmount">Direct Financial Loss (INR)</label>
-        <input type="number" id="lossAmount" placeholder="e.g. 850" min="1" />
-      </div>
-
-      <div class="form-group">
-        <label for="proofFile">Proof Document (Invoice, Ticket, Chat Screenshot)</label>
-        <input type="file" id="proofFile" accept="image/*,.pdf" />
-      </div>
-
-      <div class="form-group">
-        <label for="grievanceDetails">Dispute Incident Summary</label>
-        <textarea id="grievanceDetails" placeholder="Describe the incident timeline, what service was promised vs delivered, and the merchant's refusal to remediate..."></textarea>
-      </div>
-
-      <div class="btn-row">
-        <button class="btn btn-secondary" onclick="goToStep(1)">← Back</button>
-        <button class="btn btn-primary" id="auditSubmitBtn" onclick="submitAuditedClaim()">Audit & Generate Legal Demand →</button>
-      </div>
-    </div>
-
-    <!-- STEP 3 -->
-    <div id="step3" class="hidden">
-      <div id="evidenceAlert" class="banner banner-warning hidden">
-        <h3>⚠️ Evidence Audit Failed</h3>
-        <p style="margin: 0; font-size: 14px; color: #fde68a;">To ensure legal validity and prevent misuse, this claim requires:</p>
-        <ul id="missingList"></ul>
-        <div style="margin-top: 1rem;">
-          <button class="btn btn-secondary" onclick="goToStep(2)">← Edit Details & Upload Required Proof</button>
-        </div>
-      </div>
-
-      <div id="rejectionAlert" class="banner banner-danger hidden">
-        <h3>🚫 Claim Not Legally Actionable</h3>
-        <p id="rejectionText"></p>
-        <div style="margin-top: 1rem;">
-          <button class="btn btn-secondary" onclick="goToStep(1)">← Start Over</button>
-        </div>
-      </div>
-
-      <div id="verifiedResult" class="card hidden">
-        <div class="section-title" style="color: #22c55e; display: flex; justify-content: space-between; margin-bottom: 1rem;">
-          <span>✅ Legally Verified: <span id="resCaseRef"></span></span>
-          <span id="resProvision" style="font-size: 12px; color: #94a3b8; font-weight: normal;"></span>
-        </div>
-
-        <div class="grid-stats">
-          <div class="stat-box">
-            <small>Verified Loss</small>
-            <div class="val" id="resLoss">₹0</div>
-          </div>
-          <div class="stat-box">
-            <small>Compensation</small>
-            <div class="val" id="resComp">₹0</div>
-          </div>
-          <div class="stat-box highlight">
-            <small>User Payout (95%)</small>
-            <div class="val" id="resPayout">₹0</div>
-          </div>
-          <div class="stat-box">
-            <small>Platform Fee (5%)</small>
-            <div class="val" id="resFee">₹0</div>
-          </div>
-        </div>
-
-        <div class="notice-wrapper">
-          <div class="notice-header">
-            <span>STATUTORY DEMAND NOTICE (15-DAY REMEDY WINDOW)</span>
-            <span>EVIDENCE-SUBSTANTIATED</span>
-          </div>
-          <div class="notice-body" id="resDraft"></div>
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-secondary" onclick="goToStep(1)">File Another Dispute</button>
-          <button class="btn btn-pdf" id="pdfBtn" style="flex: 2;">📄 Download Verified Notice (.PDF)</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="step-title" style="font-size: 16px;">📂 Claims Ledger (Persistent Database)</div>
-      <div style="overflow-x: auto; margin-top: 10px;">
-        <table>
-          <thead>
-            <tr>
-              <th>Reference</th>
-              <th>Opposite Party</th>
-              <th>Loss</th>
-              <th>Total Claim</th>
-              <th>User Payout (95%)</th>
-              <th>Status</th>
-              <th>Notice</th>
-            </tr>
-          </thead>
-          <tbody id="caseHistoryBody">
-            <tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 14px;">Loading ledger records...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    window.addEventListener('DOMContentLoaded', fetchHistory);
-
-    function goToStep(step) {
-      if (step === 2) {
-        const merchant = document.getElementById('merchantName').value.trim();
-        if (!merchant) return alert("Please specify the business or merchant name.");
-      }
-
-      document.getElementById('step1').classList.add('hidden');
-      document.getElementById('step2').classList.add('hidden');
-      document.getElementById('step3').classList.add('hidden');
-
-      for (let i = 1; i <= 3; i++) {
-        const ind = document.getElementById(`stepIndicator${i}`);
-        ind.classList.remove('active', 'completed');
-        if (i < step) ind.classList.add('completed');
-        if (i === step) ind.classList.add('active');
-      }
-
-      document.getElementById(`step${step}`).classList.remove('hidden');
-    }
-
-    async function submitAuditedClaim() {
-      const category = document.getElementById('merchantCategory').value;
-      const merchant = document.getElementById('merchantName').value.trim();
-      const loss = parseFloat(document.getElementById('lossAmount').value) || 0;
-      const details = document.getElementById('grievanceDetails').value.trim();
-      const fileInput = document.getElementById('proofFile');
-      const filename = fileInput.files.length > 0 ? fileInput.files[0].name : null;
-
-      if (!details) return alert("Please specify the details of the incident.");
-
-      const fullComplaint = `[Category: ${category}] [Merchant: ${merchant}] ${details}`;
-
-      const btn = document.getElementById('auditSubmitBtn');
-      btn.disabled = true;
-      btn.innerText = "Auditing evidence & calculating lawful compensation...";
-
-      goToStep(3);
-      document.getElementById('evidenceAlert').classList.add('hidden');
-      document.getElementById('rejectionAlert').classList.add('hidden');
-      document.getElementById('verifiedResult').classList.add('hidden');
-
-      try {
-        const res = await fetch('/analyze-complaint', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            user_text: fullComplaint,
-            stated_loss: loss,
-            proof_filename: filename
-          })
-        });
-
-        if (!res.ok) throw new Error("Server error " + res.status);
-        const data = await res.json();
-
-        if (data.is_valid_claim === false) {
-          document.getElementById('rejectionAlert').classList.remove('hidden');
-          document.getElementById('rejectionText').innerText = data.rejection_reason;
-        } else if (data.evidence_sufficient === false) {
-          document.getElementById('evidenceAlert').classList.remove('hidden');
-          const list = document.getElementById('missingList');
-          list.innerHTML = '';
-          data.missing_evidence_notes.forEach(note => {
-            const li = document.createElement('li');
-            li.innerText = note;
-            list.appendChild(li);
-          });
-        } else {
-          document.getElementById('verifiedResult').classList.remove('hidden');
-          document.getElementById('resCaseRef').innerText = data.case_ref;
-          document.getElementById('resProvision').innerText = data.statutory_provision || "Consumer Protection Act, 2019";
-          document.getElementById('resLoss').innerText = '₹' + data.actual_loss;
-          document.getElementById('resComp').innerText = '₹' + data.compensation_claimed;
-          document.getElementById('resPayout').innerText = '₹' + data.user_payout;
-          document.getElementById('resFee').innerText = '₹' + data.platform_fee;
-          document.getElementById('resDraft').innerText = data.demand_notice_draft;
-
-          document.getElementById('pdfBtn').onclick = () => {
-            window.location.href = `/download-notice/${data.case_ref}`;
-          };
-
-          fetchHistory();
-        }
-      } catch (err) {
-        alert("Failed to audit claim: " + err.message);
-      } finally {
-        btn.disabled = false;
-        btn.innerText = "Audit & Generate Legal Demand →";
-      }
-    }
-
-    async function fetchHistory() {
-      try {
-        const res = await fetch('/cases');
-        const cases = await res.json();
-        const tbody = document.getElementById('caseHistoryBody');
-        tbody.innerHTML = '';
-
-        if (!cases || cases.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 14px;">No cases recorded yet.</td></tr>';
-          return;
+        function checkUserSession() {
+            if (currentUser) {
+                document.getElementById("auth-nav-box").innerHTML = `
+                    <div class="flex items-center space-x-2 text-xs">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                        <span class="font-medium text-slate-200">${currentUser.full_name}</span>
+                        <span class="text-slate-500 font-mono">(${currentUser.upi_id})</span>
+                        <button onclick="logout()" class="text-slate-400 hover:text-red-400 ml-2"><i class="fa-solid fa-right-from-bracket"></i></button>
+                    </div>
+                `;
+                fetchDashboard();
+            }
         }
 
-        cases.forEach(c => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td style="font-weight: 600; color: #f8fafc;">${c.case_ref}</td>
-            <td>${c.merchant_name || 'N/A'}</td>
-            <td>₹${c.actual_loss}</td>
-            <td style="font-weight: 700; color: #38bdf8;">₹${c.recommended_demand}</td>
-            <td style="color: #4ade80; font-weight: 600;">₹${c.user_payout}</td>
-            <td><span style="color: #22c55e;">${c.status}</span></td>
-            <td><a class="link-dl" href="/download-notice/${c.case_ref}" target="_blank">Download PDF</a></td>
-          `;
-          tbody.appendChild(row);
-        });
-      } catch (err) {
-        console.error("Error loading ledger:", err);
-      }
-    }
-  </script>
+        function checkNCHConvergence() {
+            const val = document.getElementById("disp-respondent").value.toLowerCase();
+            const badge = document.getElementById("convergence-badge");
+            const isMatch = convergenceList.some(p => val.includes(p));
+            badge.classList.toggle("hidden", !isMatch);
+        }
+
+        function toggleDarkPatternSelect() {
+            const chk = document.getElementById("dark-pattern-toggle").checked;
+            document.getElementById("dark-pattern-type").classList.toggle("hidden", !chk);
+        }
+
+        function updateCalculations() {
+            const cat = document.getElementById("disp-category").value;
+            const amt = parseFloat(document.getElementById("disp-amount").value) || 0.0;
+            const incDate = new Date(document.getElementById("disp-date").value);
+            const today = new Date();
+            const daysPassed = Math.max(1, Math.floor((today - incDate)/(1000*60*60*24)));
+
+            let stat = 1500.0;
+            if (cat.includes("Flight")) stat = 7500.0;
+            else if (cat.includes("Train")) stat = amt;
+            else if (cat.includes("Telecom")) stat = 1200.0;
+            else if (cat.includes("E-Commerce")) stat = 1000.0;
+
+            const interest = Math.round(amt * (0.12 / 365) * daysPassed);
+            const total = amt + stat + interest + 1500.0;
+            const payout = Math.round(total * 0.95);
+            const fee = Math.round(total * 0.05);
+
+            document.getElementById("calc-principal").innerText = "₹" + amt.toLocaleString();
+            document.getElementById("calc-statutory").innerText = "₹" + stat.toLocaleString();
+            document.getElementById("calc-interest").innerText = "₹" + interest.toLocaleString();
+            document.getElementById("calc-total").innerText = "₹" + total.toLocaleString();
+            document.getElementById("calc-payout").innerText = "₹" + payout.toLocaleString();
+            document.getElementById("calc-fee").innerText = "₹" + fee.toLocaleString();
+        }
+
+        function stampGPS() {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    gpsData = `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+                    document.getElementById("gps-log").innerHTML = `<span class="text-emerald-400">✓ Coordinates:</span> ${gpsData}`;
+                },
+                () => { document.getElementById("gps-log").innerText = "GPS access denied."; }
+            );
+        }
+
+        async function stampNetwork() {
+            const start = Date.now();
+            await fetch("/");
+            const lat = Date.now() - start;
+            networkData = `${lat}ms latency`;
+            document.getElementById("network-log").innerHTML = `<span class="text-emerald-400">✓ Diagnostic:</span> ${lat}ms RTT`;
+        }
+
+        async function submitDispute() {
+            if (!currentUser) return openAuthModal();
+            if (!document.getElementById("clean-hands-check").checked) return alert("Clean hands declaration required.");
+
+            const payload = {
+                user_email: currentUser.email,
+                respondent_name: document.getElementById("disp-respondent").value || "Respondent Entity",
+                category: document.getElementById("disp-category").value,
+                incident_date: document.getElementById("disp-date").value,
+                invoice_amount: parseFloat(document.getElementById("disp-amount").value) || 1000.0,
+                narrative: document.getElementById("disp-narrative").value || "Deficiency of service under CPA 2019.",
+                dark_pattern: document.getElementById("dark-pattern-toggle").checked,
+                dark_pattern_type: document.getElementById("dark-pattern-type").value,
+                gps_log: gpsData,
+                network_log: networkData
+            };
+
+            await fetch("/api/audit-and-file", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(payload)
+            });
+            fetchDashboard();
+        }
+
+        async function fetchDashboard() {
+            if (!currentUser) return;
+            const res = await fetch(`/api/dashboard/${currentUser.email}`);
+            const data = await res.json();
+
+            document.getElementById("metric-recovered").innerText = "₹" + data.total_recovered.toLocaleString();
+            document.getElementById("metric-active").innerText = data.active_disputes;
+
+            const box = document.getElementById("cases-container");
+            if (data.claims.length === 0) {
+                box.innerHTML = `<div class="text-xs text-slate-400 p-6 text-center border border-dashed border-slate-800 rounded-xl">No active claims found.</div>`;
+                return;
+            }
+
+            box.innerHTML = data.claims.map(c => `
+                <div class="bg-slate-950 border border-slate-800 p-5 rounded-2xl space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                        <div>
+                            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">${c.case_ref}</span>
+                            ${c.is_nch_partner ? '<span class="text-[10px] ml-1 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">NCH Partner</span>' : ''}
+                            ${c.dark_pattern ? '<span class="text-[10px] ml-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">CCPA Dark Pattern</span>' : ''}
+                            <h3 class="font-bold text-white text-sm mt-1">${c.respondent} • <span class="text-xs text-slate-400 font-normal">${c.category}</span></h3>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs font-bold text-emerald-400">Demand: ₹${c.total_claim.toLocaleString()}</span>
+                            <p class="text-[10px] text-slate-400">Payout (95%): ₹${c.user_payout.toLocaleString()}</p>
+                        </div>
+                    </div>
+
+                    <!-- Verified Corporate Apology Delivery Banner -->
+                    ${c.apology_text ? `
+                        <div class="p-3.5 bg-indigo-950/40 border border-indigo-500/30 rounded-xl text-xs space-y-1">
+                            <div class="flex items-center space-x-1.5 font-bold text-indigo-300">
+                                <i class="fa-solid fa-certificate text-emerald-400"></i>
+                                <span>Official Corporate Apology & Admission of Deficiency</span>
+                            </div>
+                            <p class="text-slate-300 italic">"${c.apology_text}"</p>
+                            <p class="text-[10px] text-slate-400 pt-0.5">— Signed: ${c.apology_officer || 'Designated Grievance Desk'}</p>
+                        </div>
+                    ` : ''}
+
+                    <div class="grid grid-cols-3 gap-2 text-center text-[11px] font-medium pt-1">
+                        <div class="p-2 rounded-xl ${c.stage === 'STAGE_1_NOTICE' ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30' : 'bg-slate-900 text-slate-500'}">
+                            Stage 1: Notice (${c.days_left}d cure)
+                        </div>
+                        <div class="p-2 rounded-xl ${c.stage === 'STAGE_2_NCH' ? 'bg-amber-600/20 text-amber-300 border border-amber-500/30' : 'bg-slate-900 text-slate-500'}">
+                            Stage 2: NCH (1915)
+                        </div>
+                        <div class="p-2 rounded-xl ${c.stage === 'STAGE_3_COURT' ? 'bg-red-600/20 text-red-300 border border-red-500/30' : 'bg-slate-900 text-slate-500'}">
+                            Stage 3: e-Daakhil
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
+                        <div class="flex items-center space-x-2">
+                            <a href="${c.pdf_url}" target="_blank" class="py-2 px-3 bg-slate-900 border border-slate-700 text-xs font-semibold rounded-xl flex items-center space-x-1">
+                                <i class="fa-solid fa-file-pdf text-red-400"></i>
+                                <span>Legal Notice</span>
+                            </a>
+                            <a href="${c.settle_link}" target="_blank" class="py-2 px-3 bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 text-xs font-semibold rounded-xl">
+                                Corporate Settlement Desk
+                            </a>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            ${c.stage === 'STAGE_1_NOTICE' ? `<button onclick="escalateNCH('${c.case_ref}')" class="py-2 px-3 bg-amber-600/20 text-amber-300 border border-amber-500/30 text-xs font-semibold rounded-xl">Escalate to NCH</button>` : ''}
+                            ${c.stage === 'STAGE_2_NCH' ? `<button onclick="escalateCourt('${c.case_ref}')" class="py-2 px-3 bg-red-600/20 text-red-300 border border-red-500/30 text-xs font-semibold rounded-xl">Compile Court Petition</button>` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function escalateNCH(ref) { await fetch(`/api/escalate-nch/${ref}`, { method: "POST" }); fetchDashboard(); }
+        async function escalateCourt(ref) { await fetch(`/api/escalate-court/${ref}`, { method: "POST" }); fetchDashboard(); }
+        function openAuthModal() { document.getElementById("auth-modal").classList.remove("hidden"); }
+        function closeAuthModal() { document.getElementById("auth-modal").classList.add("hidden"); }
+        async function submitAuth() {
+            const payload = {
+                full_name: document.getElementById("auth-name").value,
+                email: document.getElementById("auth-email").value,
+                phone: document.getElementById("auth-phone").value,
+                pincode: document.getElementById("auth-pincode").value,
+                upi_id: document.getElementById("auth-upi").value
+            };
+            const res = await fetch("/api/register", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(payload)
+            });
+            currentUser = await res.json();
+            localStorage.setItem("refundr_user", JSON.stringify(currentUser));
+            closeAuthModal();
+            checkUserSession();
+        }
+        function logout() { localStorage.removeItem("refundr_user"); location.reload(); }
+
+        checkUserSession();
+        updateCalculations();
+    </script>
 </body>
 </html>
