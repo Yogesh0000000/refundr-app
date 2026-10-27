@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Refundr - AI Forensic Consumer Legal Engine</title>
+    <title>Refundr - AI Forensic Consumer Legal Recovery Engine</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -26,7 +26,7 @@
     </header>
 
     <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        <!-- Top Metrics Cards (100% User Restitution, Zero Platform Cut) -->
+        <!-- Top Metrics Cards -->
         <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
                 <p class="text-xs text-slate-400">Total Money Recovered</p>
@@ -67,18 +67,19 @@
                         <label class="text-slate-400 font-medium">Statutory Dispute Sector</label>
                         <select id="disp-category" onchange="onCategoryChange()" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
                             <option value="Cinema / Movie Show Delay & Cancellation">Cinema & Multiplex (PVR, INOX, BMS Disruption)</option>
-                            <option value="Aviation / Flight Delay">Civil Aviation (DGCA CAR Flight Delays 3h+)</option>
                             <option value="Banking / UPI / Failed Transaction Failure">Banking, UPI & ATMs (RBI ₹100/day TAT Penalty)</option>
-                            <option value="Railways / IRCTC TDR">Railways & IRCTC (TDR Refund Rules)</option>
+                            <option value="Aviation / Flight Delay">Civil Aviation (DGCA CAR Flight Delays 3h+)</option>
+                            <option value="Railways / IRCTC TDR">Railways & IRCTC (TDR 100% Refund Rules)</option>
                             <option value="E-Commerce Defective Return">E-Commerce & Retail (Defective Goods / Return Refusal)</option>
                             <option value="Food Delivery / Restaurant Deficiency">Food & Dining Safety (FSSAI Delivery Deficiency)</option>
                             <option value="Telecom / Broadband Outage">Telecom & Broadband (TRAI QoS Rebate)</option>
                             <option value="Cab / Ride Hailing Failure">Cab Aggregators (Uber, Ola Cancellation Rules)</option>
+                            <option value="Legal Metrology Overcharging MRP">Dual MRP / Overcharging (Legal Metrology Sec 36)</option>
                             <option value="Insurance / Mediclaim Repudiation">Insurance & Mediclaim (IRDAI Repudiation Rules)</option>
-                            <option value="Hospital / Healthcare Negligence">Hospitals & Diagnostic Labs (Medical Negligence)</option>
+                            <option value="Hospital / Healthcare Negligence">Hospitals & Diagnostic Labs (Clinical Establishments Act)</option>
                             <option value="EdTech / Coaching Fee Refusal">EdTech & Coaching Centers (CCPA Refund Guidelines)</option>
-                            <option value="Real Estate / Housing Construction">Real Estate & Delayed Possession (RERA Act)</option>
-                            <option value="Universal Consumer Service Deficiency">Universal Consumer Dispute (CPA 2019 Sec 2(11))</option>
+                            <option value="Real Estate / Housing Construction">Real Estate & Delayed Possession (RERA Act 2016)</option>
+                            <option value="Universal Consumer Service Deficiency">Universal Consumer Dispute (CPA 2019 Sec 39)</option>
                         </select>
                     </div>
                 </div>
@@ -90,7 +91,7 @@
                         <span>Mandatory Statutory Evidence Required:</span>
                     </div>
                     <p id="statutory-proof-text" class="text-slate-300">
-                        Upload your <b>Booking Confirmation, Movie Ticket PDF, or Box-Office Receipt</b> clearly showing the showtime and ticket amount.
+                        Upload your <b>Booking Confirmation, Movie Ticket PDF, or Box-Office Receipt</b> clearly showing the showtime and ticket amount under Section 2(11) CPA 2019.
                     </p>
                 </div>
 
@@ -105,13 +106,11 @@
                     </label>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <!-- Live Camera Button -->
                         <label class="cursor-pointer flex items-center justify-center space-x-2 py-3 bg-slate-900 border border-dashed border-slate-700 hover:border-indigo-500 rounded-xl transition text-slate-300">
                             <i class="fa-solid fa-camera text-base text-indigo-400"></i>
                             <span class="font-semibold text-xs">Take Live Photo</span>
                             <input id="camera-input" type="file" accept="image/*" capture="environment" onchange="handleEvidenceUpload(event)" class="hidden">
                         </label>
-                        <!-- Gallery Upload Button -->
                         <label class="cursor-pointer flex items-center justify-center space-x-2 py-3 bg-slate-900 border border-dashed border-slate-700 hover:border-indigo-500 rounded-xl transition text-slate-300">
                             <i class="fa-solid fa-file-arrow-up text-base text-emerald-400"></i>
                             <span class="font-semibold text-xs">Upload from Gallery / PDF</span>
@@ -167,18 +166,18 @@
                     <label for="clean-hands-check"><b>Statutory Clean-Hands Declaration:</b> I confirm no previous settlement, voucher, or parallel dispute has been accepted for this incident.</label>
                 </div>
 
-                <!-- Live Statutory Calculation Engine Display (100% User Recovery) -->
+                <!-- Live Statutory Calculation Engine Display (Strict Government Anchored Rules) -->
                 <div class="bg-indigo-950/30 border border-indigo-500/20 p-4 rounded-xl text-xs space-y-1 font-mono">
                     <div class="flex justify-between text-slate-300"><span>Principal Loss Restitution:</span><span id="calc-principal">₹0.00</span></div>
-                    <div class="flex justify-between text-slate-300"><span>Statutory Regulatory Relief:</span><span id="calc-statutory">₹1,500.00</span></div>
+                    <div class="flex justify-between text-slate-300"><span>Statutory Regulatory Relief (Govt Rules):</span><span id="calc-statutory">₹0.00</span></div>
                     <div class="flex justify-between text-amber-400"><span>Accrued Interest (12% p.a.):</span><span id="calc-interest">₹0.00</span></div>
                     <div class="flex justify-between text-slate-400"><span>Notice Preparation Expense (Billed to Company):</span><span>₹1,500.00</span></div>
                     <div class="flex justify-between font-bold text-emerald-400 border-t border-indigo-500/30 pt-1 text-sm">
-                        <span>Total Statutory Demand:</span><span id="calc-total">₹3,000.00</span>
+                        <span>Total Statutory Demand:</span><span id="calc-total">₹1,500.00</span>
                     </div>
                     <div class="flex justify-between text-[11px] text-emerald-300 pt-1 border-t border-slate-800">
                         <span>100% Payout to Your Linked UPI:</span>
-                        <b class="text-emerald-400 text-sm" id="calc-payout">₹1,500.00</b>
+                        <b class="text-emerald-400 text-sm" id="calc-payout">₹0.00</b>
                     </div>
                 </div>
 
@@ -254,13 +253,14 @@
 
         const statutoryGuidance = {
             "Cinema / Movie Show Delay & Cancellation": "Upload your <b>Booking Confirmation, Movie Ticket PDF, or Box-Office Receipt</b> clearly showing the showtime and ticket amount under Section 2(11) CPA 2019.",
-            "Aviation / Flight Delay": "Upload your <b>Flight E-Ticket or Boarding Pass</b> with PNR under DGCA CAR Section 3, Series M.",
             "Banking / UPI / Failed Transaction Failure": "Upload the <b>Bank Statement or Failed UPI App Screenshot showing the 12-digit UTR</b> under RBI Harmonisation Rules.",
+            "Aviation / Flight Delay": "Upload your <b>Flight E-Ticket or Boarding Pass</b> with PNR under DGCA CAR Section 3, Series M, Part IV.",
             "Railways / IRCTC TDR": "Upload your <b>IRCTC Electronic Reservation Slip (ERS) or TDR Acknowledgement</b>.",
             "E-Commerce Defective Return": "Upload the <b>Tax Invoice & Clear Photograph of the Defective/Missing Item</b> under E-Commerce Rules 2020.",
             "Food Delivery / Restaurant Deficiency": "Upload the <b>Delivery Receipt & Photo of contaminated/incorrect food</b> under FSSAI Act 2006.",
-            "Telecom / Broadband Outage": "Upload your <b>Latest Monthly Broadband Bill or Unresolved Complaint Ticket Number</b>.",
-            "Universal Consumer Service Deficiency": "Upload any <b>Proof of Payment (Bill, Receipt, Bank Debit, or Booking Slip)</b> under Section 2(42) CPA 2019."
+            "Telecom / Broadband Outage": "Upload your <b>Latest Monthly Broadband Bill or Unresolved Complaint Ticket Number</b> under TRAI QoS Regulations.",
+            "Legal Metrology Overcharging MRP": "Upload a <b>Clear Photo of the Package Label showing printed MRP vs Retail Invoice</b> under Legal Metrology Act 2009.",
+            "Universal Consumer Service Deficiency": "Upload any <b>Proof of Payment (Bill, Receipt, Bank Debit, or Booking Slip)</b> under Section 39 CPA 2019."
         };
 
         document.getElementById("disp-date").value = new Date().toISOString().split('T')[0];
@@ -298,7 +298,6 @@
             document.getElementById("dark-pattern-type").classList.toggle("hidden", !chk);
         }
 
-        // AI Evidence Forensic Verification Handler
         async function handleEvidenceUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -343,7 +342,6 @@
 
                 auditBadge.classList.remove("hidden");
 
-                // Auto-fill extracted values
                 if (data.extracted_amount && data.extracted_amount > 0) {
                     document.getElementById("disp-amount").value = data.extracted_amount;
                 }
@@ -353,7 +351,7 @@
                 updateCalculations();
             } catch (err) {
                 scanBox.className = "p-3 rounded-xl border border-amber-500/40 bg-amber-950/20 font-mono text-[11px] space-y-1 block";
-                scanTitle.innerHTML = `<span class="text-amber-400 font-bold">✓ Stamped Offline Cryptographic Hash</span>`;
+                scanTitle.innerHTML = `<span class="text-amber-400 font-bold">✓ Stamped Cryptographic Digest</span>`;
                 scanDesc.innerText = "Evidence digest locked. Proceeding with statutory filing.";
             }
         }
@@ -365,22 +363,38 @@
             const today = new Date();
             const daysPassed = Math.max(1, Math.floor((today - incDate)/(1000*60*60*24)));
 
-            let stat = 1500.0;
-            if (cat.includes("aviation") || cat.includes("flight")) stat = 7500.0;
-            else if (cat.includes("railway") || cat.includes("train")) stat = amt;
-            else if (cat.includes("banking") || cat.includes("upi")) stat = Math.min(25000.0, Math.max(1, daysPassed - 1) * 100);
-            else if (cat.includes("telecom")) stat = 1200.0;
-            else if (cat.includes("cinema") || cat.includes("movie")) stat = Math.round(amt * 0.5 + 1000.0);
-            else if (cat.includes("food")) stat = 1000.0;
-            else if (cat.includes("cab") || cat.includes("ride")) stat = 750.0;
-            else if (cat.includes("insurance")) stat = 5000.0;
-            else if (cat.includes("hospital") || cat.includes("medical")) stat = 3500.0;
-            else if (cat.includes("edtech") || cat.includes("coaching")) stat = Math.round(amt * 0.5 + 2000.0);
-            else if (cat.includes("real estate")) stat = 10000.0;
+            let stat = 0.0;
+            // Strict Government Rules
+            if (cat.includes("banking") || cat.includes("upi")) {
+                const tat = cat.includes("upi") ? 1 : 5;
+                stat = Math.max(0, daysPassed - tat) * 100.0;
+            } else if (cat.includes("aviation") || cat.includes("flight")) {
+                stat = Math.min(10000.0, Math.max(5000.0, Math.round(amt * 0.8)));
+            } else if (cat.includes("railway") || cat.includes("train")) {
+                stat = amt;
+            } else if (cat.includes("cinema") || cat.includes("movie")) {
+                stat = Math.round(amt * 0.5 + 1000.0);
+            } else if (cat.includes("telecom") || cat.includes("broadband")) {
+                stat = Math.round(Math.min(amt, (amt / 30) * daysPassed));
+            } else if (cat.includes("food")) {
+                stat = amt;
+            } else if (cat.includes("cab") || cat.includes("ride")) {
+                stat = 750.0;
+            } else if (cat.includes("metrology") || cat.includes("mrp")) {
+                stat = 2000.0;
+            } else if (cat.includes("insurance")) {
+                stat = 5000.0;
+            } else if (cat.includes("hospital") || cat.includes("medical")) {
+                stat = 3500.0;
+            } else if (cat.includes("edtech") || cat.includes("coaching")) {
+                stat = Math.round(amt * 0.5 + 2000.0);
+            } else if (cat.includes("real estate")) {
+                stat = 10000.0;
+            }
 
             const interest = Math.round(amt * (0.12 / 365) * daysPassed);
             const total = amt + stat + interest + 1500.0;
-            const userPayout = amt + stat + interest; // 100% User Restitution (No 5% cut)
+            const userPayout = amt + stat + interest; // 100% User Restitution
 
             document.getElementById("calc-principal").innerText = "₹" + amt.toLocaleString();
             document.getElementById("calc-statutory").innerText = "₹" + stat.toLocaleString();
