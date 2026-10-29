@@ -1,557 +1,546 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Refundr - AI Forensic Consumer Legal Recovery Engine</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Refundr | Automated Statutory Consumer Grievance Escalation</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #0b1120; color: #f8fafc; }
+    .category-card { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+    .category-card:hover { transform: translateY(-2px); border-color: #38bdf8; }
+    .category-card.selected { border-color: #0284c7; background: rgba(2, 132, 199, 0.15); }
+    .subissue-pill { transition: all 0.15s ease; }
+    .subissue-pill.active { background: #0284c7; color: #ffffff; border-color: #38bdf8; }
+  </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
-    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
-        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-black text-white text-base">R</div>
-                <div>
-                    <span class="text-lg font-bold tracking-tight">Refundr</span>
-                    <span class="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">100% Consumer Recovery • AI Audited</span>
-                </div>
-            </div>
-            <div id="auth-nav-box" class="flex items-center space-x-3">
-                <button onclick="openAuthModal()" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl font-semibold transition">
-                    Sign In / Register
-                </button>
-            </div>
+<body class="min-h-screen pb-16">
+
+  <!-- Top Navigation Header -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50 px-6 py-4">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+          <i class="fa-solid fa-scale-balanced text-lg text-white"></i>
         </div>
-    </header>
-
-    <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        <!-- Top Metrics Cards -->
-        <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-                <p class="text-xs text-slate-400">Total Money Recovered</p>
-                <p id="metric-recovered" class="text-2xl font-black text-emerald-400 mt-1">₹0</p>
-                <p class="text-[10px] text-slate-500 mt-1">Disbursed via Direct UPI</p>
-            </div>
-            <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-                <p class="text-xs text-slate-400">Claims in Active Dispute</p>
-                <p id="metric-active" class="text-2xl font-black text-amber-400 mt-1">0</p>
-                <p class="text-[10px] text-slate-500 mt-1">Under 7-Day Cure Window</p>
-            </div>
-            <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-                <p class="text-xs text-slate-400">Consumer Recovery Rate</p>
-                <p class="text-2xl font-black text-indigo-400 mt-1">100%</p>
-                <p class="text-[10px] text-slate-500 mt-1">Zero commission taken from you</p>
-            </div>
-        </section>
-
-        <!-- Intake Screen -->
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
-                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <h2 class="text-sm font-bold text-white flex items-center space-x-2">
-                        <i class="fa-solid fa-scale-balanced text-indigo-400"></i>
-                        <span>File Statutory Dispute with AI Evidence Audit</span>
-                    </h2>
-                    <span id="convergence-badge" class="hidden text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                        ✓ NCH Convergence Partner
-                    </span>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                    <div>
-                        <label class="text-slate-400 font-medium">Opposite Party (Company / Airline / Bank / Brand)</label>
-                        <input id="disp-respondent" oninput="checkNCHConvergence()" type="text" placeholder="e.g. PVR, IndiGo, Flipkart, HDFC Bank" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
-                    </div>
-                    <div>
-                        <label class="text-slate-400 font-medium">Statutory Dispute Sector</label>
-                        <select id="disp-category" onchange="onCategoryChange()" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
-                            <option value="Cinema / Movie Show Delay & Cancellation">Cinema & Multiplex (PVR, INOX, BMS Disruption)</option>
-                            <option value="Banking / UPI / Failed Transaction Failure">Banking, UPI & ATMs (RBI ₹100/day TAT Penalty)</option>
-                            <option value="Aviation / Flight Delay">Civil Aviation (DGCA CAR Flight Delays 3h+)</option>
-                            <option value="Railways / IRCTC TDR">Railways & IRCTC (TDR 100% Refund Rules)</option>
-                            <option value="E-Commerce Defective Return">E-Commerce & Retail (Defective Goods / Return Refusal)</option>
-                            <option value="Food Delivery / Restaurant Deficiency">Food & Dining Safety (FSSAI Delivery Deficiency)</option>
-                            <option value="Telecom / Broadband Outage">Telecom & Broadband (TRAI QoS Rebate)</option>
-                            <option value="Cab / Ride Hailing Failure">Cab Aggregators (Uber, Ola Cancellation Rules)</option>
-                            <option value="Legal Metrology Overcharging MRP">Dual MRP / Overcharging (Legal Metrology Sec 36)</option>
-                            <option value="Insurance / Mediclaim Repudiation">Insurance & Mediclaim (IRDAI Repudiation Rules)</option>
-                            <option value="Hospital / Healthcare Negligence">Hospitals & Diagnostic Labs (Clinical Establishments Act)</option>
-                            <option value="EdTech / Coaching Fee Refusal">EdTech & Coaching Centers (CCPA Refund Guidelines)</option>
-                            <option value="Real Estate / Housing Construction">Real Estate & Delayed Possession (RERA Act 2016)</option>
-                            <option value="Universal Consumer Service Deficiency">Universal Consumer Dispute (CPA 2019 Sec 39)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- DYNAMIC STATUTORY PROOF REQUIREMENT BANNER -->
-                <div id="statutory-proof-box" class="bg-indigo-950/40 border border-indigo-500/30 p-3.5 rounded-xl text-xs space-y-1">
-                    <div class="flex items-center space-x-1.5 font-bold text-indigo-300">
-                        <i class="fa-solid fa-circle-info text-indigo-400"></i>
-                        <span>Mandatory Statutory Evidence Required:</span>
-                    </div>
-                    <p id="statutory-proof-text" class="text-slate-300">
-                        Upload your <b>Booking Confirmation, Movie Ticket PDF, or Box-Office Receipt</b> clearly showing the showtime and ticket amount under Section 2(11) CPA 2019.
-                    </p>
-                </div>
-
-                <!-- DUAL-MODE EVIDENCE CAPTURE (Live Photo & Gallery Upload) -->
-                <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl space-y-3 text-xs">
-                    <label class="font-bold text-slate-300 flex items-center justify-between">
-                        <span class="flex items-center space-x-1.5">
-                            <i class="fa-solid fa-camera text-emerald-400"></i>
-                            <span>Provide Evidence (Live Photo or Gallery Upload)</span>
-                        </span>
-                        <span id="evidence-audit-badge" class="hidden text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">Verified Authentic</span>
-                    </label>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <label class="cursor-pointer flex items-center justify-center space-x-2 py-3 bg-slate-900 border border-dashed border-slate-700 hover:border-indigo-500 rounded-xl transition text-slate-300">
-                            <i class="fa-solid fa-camera text-base text-indigo-400"></i>
-                            <span class="font-semibold text-xs">Take Live Photo</span>
-                            <input id="camera-input" type="file" accept="image/*" capture="environment" onchange="handleEvidenceUpload(event)" class="hidden">
-                        </label>
-                        <label class="cursor-pointer flex items-center justify-center space-x-2 py-3 bg-slate-900 border border-dashed border-slate-700 hover:border-indigo-500 rounded-xl transition text-slate-300">
-                            <i class="fa-solid fa-file-arrow-up text-base text-emerald-400"></i>
-                            <span class="font-semibold text-xs">Upload from Gallery / PDF</span>
-                            <input id="gallery-input" type="file" accept="image/*,application/pdf" onchange="handleEvidenceUpload(event)" class="hidden">
-                        </label>
-                    </div>
-
-                    <!-- AI Forensic Scan Status Box -->
-                    <div id="ai-scan-box" class="hidden p-3 rounded-xl border font-mono text-[11px] space-y-1">
-                        <div class="flex items-center justify-between">
-                            <span id="ai-scan-title" class="font-bold">Analyzing Evidence Authenticity...</span>
-                            <span id="ai-scan-hash" class="text-[9px] text-slate-400"></span>
-                        </div>
-                        <p id="ai-scan-desc" class="text-slate-300 text-[10px]"></p>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                    <div>
-                        <label class="text-slate-400 font-medium">Incident / Default Date (Auto-Detected)</label>
-                        <input id="disp-date" onchange="updateCalculations()" type="date" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
-                    </div>
-                    <div>
-                        <label class="text-slate-400 font-medium">Principal Loss / Invoice Amount (INR) (AI Extracted)</label>
-                        <input id="disp-amount" oninput="updateCalculations()" type="number" placeholder="1200" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
-                    </div>
-                </div>
-
-                <!-- CCPA Module -->
-                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
-                    <div class="flex items-center justify-between">
-                        <label class="font-bold text-amber-400 flex items-center space-x-1">
-                            <i class="fa-solid fa-eye-slash"></i>
-                            <span>CCPA Dark Pattern Auditor (2023 Guidelines)</span>
-                        </label>
-                        <input id="dark-pattern-toggle" type="checkbox" onchange="toggleDarkPatternSelect()" class="rounded border-slate-700 bg-slate-900 text-indigo-600">
-                    </div>
-                    <p class="text-[11px] text-slate-400">Did the merchant use deceptive design, drip pricing, or unrequested add-ons?</p>
-                    <select id="dark-pattern-type" class="hidden mt-2 w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 text-xs">
-                        <option value="Drip Pricing (Hidden fees added at checkout)">Drip Pricing (Hidden fees added at checkout)</option>
-                        <option value="Basket Sneaking (Unsolicited opt-ins)">Basket Sneaking (Unsolicited insurance, tips or donations)</option>
-                        <option value="Subscription Trap (Impossible cancellation)">Subscription Trap (Refusal or obstruction of cancellation)</option>
-                    </select>
-                </div>
-
-                <div class="text-xs">
-                    <label class="text-slate-400 font-medium">Deficiency Narrative & Particulars</label>
-                    <textarea id="disp-narrative" rows="2" placeholder="Summary of transaction and failure to rectify..." class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200"></textarea>
-                </div>
-
-                <div class="flex items-start space-x-2 bg-slate-950 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-400">
-                    <input id="clean-hands-check" type="checkbox" class="mt-0.5">
-                    <label for="clean-hands-check"><b>Statutory Clean-Hands Declaration:</b> I confirm no previous settlement, voucher, or parallel dispute has been accepted for this incident.</label>
-                </div>
-
-                <!-- Live Statutory Calculation Engine Display (Strict Government Anchored Rules) -->
-                <div class="bg-indigo-950/30 border border-indigo-500/20 p-4 rounded-xl text-xs space-y-1 font-mono">
-                    <div class="flex justify-between text-slate-300"><span>Principal Loss Restitution:</span><span id="calc-principal">₹0.00</span></div>
-                    <div class="flex justify-between text-slate-300"><span>Statutory Regulatory Relief (Govt Rules):</span><span id="calc-statutory">₹0.00</span></div>
-                    <div class="flex justify-between text-amber-400"><span>Accrued Interest (12% p.a.):</span><span id="calc-interest">₹0.00</span></div>
-                    <div class="flex justify-between text-slate-400"><span>Notice Preparation Expense (Billed to Company):</span><span>₹1,500.00</span></div>
-                    <div class="flex justify-between font-bold text-emerald-400 border-t border-indigo-500/30 pt-1 text-sm">
-                        <span>Total Statutory Demand:</span><span id="calc-total">₹1,500.00</span>
-                    </div>
-                    <div class="flex justify-between text-[11px] text-emerald-300 pt-1 border-t border-slate-800">
-                        <span>100% Payout to Your Linked UPI:</span>
-                        <b class="text-emerald-400 text-sm" id="calc-payout">₹0.00</b>
-                    </div>
-                </div>
-
-                <button onclick="submitDispute()" id="file-dispute-btn" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-white text-xs transition shadow-lg shadow-indigo-600/30">
-                    Audit Evidence & Issue Statutory 7-Day Demand Notice
-                </button>
-            </div>
-
-            <!-- Hardware Stamping & Network Diagnostics -->
-            <div class="space-y-4">
-                <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
-                    <h3 class="text-xs font-bold text-white flex items-center space-x-2">
-                        <i class="fa-solid fa-location-crosshairs text-blue-400"></i>
-                        <span>GPS Hub Transit Verification</span>
-                    </h3>
-                    <div id="gps-log" class="text-[10px] bg-slate-950 p-2.5 rounded-xl border border-slate-800 font-mono text-slate-300">GPS sensor idle.</div>
-                    <button onclick="stampGPS()" class="w-full py-2 bg-blue-600/20 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-semibold">Verify Location Telemetry</button>
-                </div>
-                <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
-                    <h3 class="text-xs font-bold text-white flex items-center space-x-2">
-                        <i class="fa-solid fa-wifi text-purple-400"></i>
-                        <span>Network Outage Diagnostic</span>
-                    </h3>
-                    <div id="network-log" class="text-[10px] bg-slate-950 p-2.5 rounded-xl border border-slate-800 font-mono text-slate-300">Diagnostics ready.</div>
-                    <button onclick="stampNetwork()" class="w-full py-2 bg-purple-600/20 text-purple-300 border border-purple-500/30 rounded-xl text-xs font-semibold">Run Latency Diagnostic</button>
-                </div>
-            </div>
-        </section>
-
-        <!-- Active Dockets -->
-        <section class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
-            <h2 class="text-sm font-bold text-white flex items-center space-x-2">
-                <i class="fa-solid fa-list-check text-emerald-400"></i>
-                <span>Active Dispute Dockets & Escalation Stepper</span>
-            </h2>
-            <div id="cases-container" class="space-y-4">
-                <div class="text-xs text-slate-400 p-6 text-center border border-dashed border-slate-800 rounded-xl">No active claims found.</div>
-            </div>
-        </section>
-    </main>
-
-    <!-- Registration Modal -->
-    <div id="auth-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 w-full max-w-md p-6 rounded-2xl space-y-4">
-            <h3 class="font-bold text-white text-sm">Consumer Identity Registration</h3>
-            <div class="space-y-3 text-xs">
-                <input id="auth-name" type="text" placeholder="Full Legal Name" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
-                <input id="auth-email" type="email" placeholder="Email Address" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
-                <div class="grid grid-cols-2 gap-2">
-                    <input id="auth-phone" type="text" placeholder="Mobile Number" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
-                    <input id="auth-pincode" type="text" placeholder="Pincode" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
-                </div>
-                <input id="auth-upi" type="text" placeholder="Payout UPI ID (e.g. name@oksbi)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200">
-            </div>
-            <button onclick="submitAuth()" class="w-full py-2.5 bg-indigo-600 font-bold rounded-xl text-xs text-white">Save Profile & Begin</button>
+        <div>
+          <span class="text-xl font-bold tracking-tight text-white">Refundr</span>
+          <span class="ml-2 text-[10px] uppercase font-semibold tracking-wider px-2 py-0.5 rounded-full bg-sky-950 text-sky-400 border border-sky-800">
+            CPA 2019 &bull; DGCA &bull; RBI TAT
+          </span>
         </div>
+      </div>
+      <div class="flex items-center space-x-3 text-xs">
+        <span class="inline-flex items-center px-3 py-1 rounded-full bg-emerald-950/80 text-emerald-400 border border-emerald-800">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 mr-2 animate-pulse"></span>
+          100% Direct Consumer Restitution &bull; Zero Commission
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-6xl mx-auto px-6 pt-8 space-y-8">
+
+    <!-- Top 3 Metric Cards (Platform Fee card completely removed) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-5">
+        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total Restitution Recovered</p>
+        <p class="text-3xl font-extrabold text-white mt-2">₹ 0</p>
+        <p class="text-xs text-slate-400 mt-1 flex items-center">
+          <i class="fa-solid fa-building-columns mr-1.5 text-sky-400"></i> Disbursed Direct via UPI
+        </p>
+      </div>
+      <div class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-5">
+        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Claims In Active Dispute</p>
+        <p class="text-3xl font-extrabold text-amber-400 mt-2" id="activeClaimsCounter">0</p>
+        <p class="text-xs text-slate-400 mt-1 flex items-center">
+          <i class="fa-regular fa-clock mr-1.5 text-amber-400"></i> Under 7-Day Statutory Cure Window
+        </p>
+      </div>
+      <div class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-5">
+        <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Consumer Recovery Retained</p>
+        <p class="text-3xl font-extrabold text-emerald-400 mt-2">100%</p>
+        <p class="text-xs text-slate-400 mt-1 flex items-center">
+          <i class="fa-solid fa-shield-halved mr-1.5 text-emerald-400"></i> Direct To Consumer UPI &bull; Zero Deduction
+        </p>
+      </div>
     </div>
 
-    <script>
-        let currentUser = JSON.parse(localStorage.getItem("refundr_user")) || null;
-        let gpsData = null;
-        let networkData = null;
-        let verifiedEvidenceHash = null;
-        let forensicStatus = "PENDING_AUDIT";
+    <!-- 10 + 1 CATEGORY SELECTION GRID -->
+    <section class="space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center">
+            <span class="w-6 h-6 rounded-md bg-sky-500/20 text-sky-400 flex items-center justify-center text-xs mr-2 font-mono">1</span>
+            Select Statutory Dispute Category
+          </h2>
+          <p class="text-xs text-slate-400 ml-8">Choose the commercial sector under which your grievance falls</p>
+        </div>
+      </div>
 
-        const convergenceList = [
-            "indigo", "air india", "spicejet", "vistara", "akasa", "irctc", 
-            "amazon", "flipkart", "myntra", "meesho", "swiggy", "zomato", "blinkit", "zepto", "bigbasket",
-            "airtel", "jio", "vodafone idea", "tata play", "makemytrip", "easemytrip", "goibibo", "yatra",
-            "pvr", "inox", "bookmyshow", "cinepolis", "uber", "ola", "rapido",
-            "hdfc", "sbi", "icici", "axis", "kotak", "pnb", "paytm", "phonepe", "google pay", "cred"
-        ];
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5" id="categoryGrid">
+        <!-- Javascript renders all 11 category cards dynamically -->
+      </div>
+    </section>
 
-        const statutoryGuidance = {
-            "Cinema / Movie Show Delay & Cancellation": "Upload your <b>Booking Confirmation, Movie Ticket PDF, or Box-Office Receipt</b> clearly showing the showtime and ticket amount under Section 2(11) CPA 2019.",
-            "Banking / UPI / Failed Transaction Failure": "Upload the <b>Bank Statement or Failed UPI App Screenshot showing the 12-digit UTR</b> under RBI Harmonisation Rules.",
-            "Aviation / Flight Delay": "Upload your <b>Flight E-Ticket or Boarding Pass</b> with PNR under DGCA CAR Section 3, Series M, Part IV.",
-            "Railways / IRCTC TDR": "Upload your <b>IRCTC Electronic Reservation Slip (ERS) or TDR Acknowledgement</b>.",
-            "E-Commerce Defective Return": "Upload the <b>Tax Invoice & Clear Photograph of the Defective/Missing Item</b> under E-Commerce Rules 2020.",
-            "Food Delivery / Restaurant Deficiency": "Upload the <b>Delivery Receipt & Photo of contaminated/incorrect food</b> under FSSAI Act 2006.",
-            "Telecom / Broadband Outage": "Upload your <b>Latest Monthly Broadband Bill or Unresolved Complaint Ticket Number</b> under TRAI QoS Regulations.",
-            "Legal Metrology Overcharging MRP": "Upload a <b>Clear Photo of the Package Label showing printed MRP vs Retail Invoice</b> under Legal Metrology Act 2009.",
-            "Universal Consumer Service Deficiency": "Upload any <b>Proof of Payment (Bill, Receipt, Bank Debit, or Booking Slip)</b> under Section 39 CPA 2019."
+    <!-- PARENT -> CHILD SUB-ISSUE SELECTOR -->
+    <section id="subIssueSection" class="hidden space-y-3 bg-slate-800/40 border border-slate-700/60 rounded-xl p-5">
+      <div class="flex items-center space-x-2">
+        <span class="w-6 h-6 rounded-md bg-sky-500/20 text-sky-400 flex items-center justify-center text-xs font-mono">2</span>
+        <h3 class="text-sm font-semibold text-white">Specific Deficiency / Cause of Action:</h3>
+      </div>
+      <div class="flex flex-wrap gap-2 pt-1" id="subIssuePills">
+        <!-- Dynamic Pills injected via JS -->
+      </div>
+    </section>
+
+    <!-- CONVERSATIONAL PROBLEM INTAKE -->
+    <section id="intakeSection" class="hidden space-y-6">
+      
+      <!-- Narrative Box -->
+      <div class="bg-slate-800/60 border border-slate-700 rounded-xl p-6 space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <span class="w-6 h-6 rounded-md bg-sky-500/20 text-sky-400 flex items-center justify-center text-xs font-mono">3</span>
+            <h3 class="text-base font-bold text-white">Tell Us What Happened</h3>
+          </div>
+          <span class="text-xs text-slate-400">Plain English, Tanglish, or Hinglish accepted</span>
+        </div>
+
+        <textarea id="narrativeInput" rows="3" 
+          placeholder="e.g. IndiGo flight 6E-204 from Chennai to Delhi was delayed by 5 hours on 29-Oct. They did not provide statutory refreshments at the gate and refused refund..." 
+          class="w-full bg-slate-900 border border-slate-700 rounded-lg p-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 transition"></textarea>
+
+        <div class="flex justify-end">
+          <button id="btnAnalyze" onclick="analyzeGrievance()" class="bg-sky-600 hover:bg-sky-500 text-white font-semibold px-5 py-2.5 rounded-lg text-sm flex items-center space-x-2 transition shadow-lg shadow-sky-600/20">
+            <i class="fa-solid fa-brain text-sky-200"></i>
+            <span>Analyze Grievance & Map Required Evidence</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- DYNAMIC AI AUDIT & TARGETED EVIDENCE CHECKLIST -->
+      <div id="aiAnalysisCard" class="hidden bg-slate-800/80 border border-sky-500/40 rounded-xl p-6 space-y-5">
+        <div class="flex items-center justify-between border-b border-slate-700/80 pb-4">
+          <div>
+            <span class="text-xs font-mono text-sky-400 uppercase tracking-wider">Statutory Analysis Engine</span>
+            <h4 class="text-base font-bold text-white mt-0.5" id="analysisEntityTitle">Analysis Complete</h4>
+          </div>
+          <span class="px-3 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 text-xs rounded-full font-mono">
+            Grounds for Relief Established
+          </span>
+        </div>
+
+        <!-- Applicable Acts & Violations Found -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div class="bg-slate-900/70 p-4 rounded-lg border border-slate-700">
+            <p class="font-bold text-slate-300 mb-2 flex items-center">
+              <i class="fa-solid fa-book-bookmark text-sky-400 mr-2"></i> Applicable Statutory Acts
+            </p>
+            <ul id="lawsList" class="space-y-1 text-slate-300"></ul>
+          </div>
+          <div class="bg-slate-900/70 p-4 rounded-lg border border-slate-700">
+            <p class="font-bold text-slate-300 mb-2 flex items-center">
+              <i class="fa-solid fa-triangle-exclamation text-amber-400 mr-2"></i> Identified Legal Violations
+            </p>
+            <ul id="violationsList" class="space-y-1 text-slate-300"></ul>
+          </div>
+        </div>
+
+        <!-- TARGETED EVIDENCE UPLOAD CHECKLIST -->
+        <div class="space-y-3">
+          <h5 class="text-sm font-semibold text-white flex items-center">
+            <i class="fa-solid fa-camera mr-2 text-sky-400"></i>
+            Contextual Evidence Checklist (Section 65B &bull; Section 63 BSA Compliant)
+          </h5>
+          <p class="text-xs text-slate-400">Our engine requires the following proofs to assemble your court-admissible notice:</p>
+          
+          <div id="evidenceCards" class="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+            <!-- Dynamically injected target evidence requirements -->
+          </div>
+        </div>
+
+        <!-- CLAIMANT & RESTITUTION DETAILS FORM -->
+        <form id="disputeForm" onsubmit="submitDispute(event)" class="pt-4 border-t border-slate-700/80 space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Claimant Full Name</label>
+              <input type="text" id="consumerName" required placeholder="e.g. Yogesh M." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Direct Settlement UPI ID</label>
+              <input type="text" id="consumerUpi" required placeholder="e.g. yogesh@oksbi" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Phone Number</label>
+              <input type="tel" id="consumerPhone" required placeholder="e.g. 9876543210" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Opposite Commercial Party</label>
+              <input type="text" id="oppositeParty" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Booking / PNR / Order ID</label>
+              <input type="text" id="referenceId" required placeholder="PNR / Transaction ID" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Date of Incident</label>
+              <input type="date" id="incidentDate" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-300 mb-1">Principal Disputed Amount (₹)</label>
+              <input type="number" step="0.01" id="principalAmount" required placeholder="3499" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+            </div>
+          </div>
+
+          <!-- Hidden Technical Data -->
+          <input type="file" id="evidenceFileInput" class="hidden">
+          <input type="hidden" id="gpsTelemetry" value="13.0827° N, 80.2707° E">
+          <input type="hidden" id="statutoryPenalty" value="0">
+          <input type="hidden" id="violationSummary" value="">
+
+          <div class="pt-3">
+            <button type="submit" id="btnSubmitNotice" class="w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-bold py-3.5 px-6 rounded-xl text-sm transition shadow-lg shadow-indigo-600/25 flex items-center justify-center space-x-2">
+              <i class="fa-solid fa-file-shield text-base"></i>
+              <span>Compile Statutory Section 65B Notice & Initiate 7-Day Cure Window</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </section>
+
+    <!-- SUCCESS DOCKET MODAL / DRAWER -->
+    <div id="successCard" class="hidden bg-slate-800 border border-emerald-500/60 rounded-xl p-8 space-y-6">
+      <div class="text-center space-y-2">
+        <div class="w-14 h-14 bg-emerald-950 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-2xl border border-emerald-500/40">
+          <i class="fa-solid fa-check"></i>
+        </div>
+        <h3 class="text-xl font-bold text-white">Statutory Pre-Litigation Docket Compiled</h3>
+        <p class="text-xs text-slate-300" id="docketSubtitle"></p>
+      </div>
+
+      <div class="bg-slate-900 p-5 rounded-lg border border-slate-700 space-y-3 font-mono text-xs">
+        <div class="flex justify-between">
+          <span class="text-slate-400">Total Statutory Claim (100% Consumer):</span>
+          <span class="text-emerald-400 font-bold text-sm" id="docketTotalDemand"></span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-400">Cryptographic Section 65B Hash:</span>
+          <span class="text-sky-400 truncate max-w-xs" id="docketHash"></span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-400">7-Day Mandatory Cure Window Expiry:</span>
+          <span class="text-amber-400 font-bold" id="docketDeadline"></span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <a id="btnDownloadNotice" href="#" target="_blank" class="bg-sky-600 hover:bg-sky-500 text-white font-semibold py-3 px-4 rounded-lg text-xs text-center flex items-center justify-center space-x-2">
+          <i class="fa-solid fa-file-pdf"></i>
+          <span>Download Certified Legal Notice (PDF)</span>
+        </a>
+        <a id="btnOpenSettlementDesk" href="#" target="_blank" class="bg-slate-700 hover:bg-slate-600 text-white font-semibold py-3 px-4 rounded-lg text-xs text-center flex items-center justify-center space-x-2">
+          <i class="fa-solid fa-arrow-up-right-from-square"></i>
+          <span>View Corporate Settlement Desk (/settle)</span>
+        </a>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // 10 + 1 CATEGORIES TAXONOMY
+    const CATEGORIES = {
+      aviation: {
+        title: "Civil Aviation",
+        icon: "fa-plane-departure",
+        desc: "DGCA CAR Rules on delays, cancellations, luggage & boarding",
+        subIssues: ["Flight Delays (>3 to 6 Hours)", "Flight Cancellations without Adequate Notice", "Denied Boarding (Overbooking)", "Baggage Lost, Damaged or Delayed"]
+      },
+      railways: {
+        title: "Railways & Transit",
+        icon: "fa-train",
+        desc: "IRCA rules, train delays >3 hrs, TDR refunds & AC coach failures",
+        subIssues: ["Train Delays Exceeding 3 Hours (Full TDR)", "AC Failure / Coach Downgrade", "Waitlisted Ticket Fee Deductions", "Coach Hygiene / Transit Service Failure"]
+      },
+      ecommerce: {
+        title: "E-Commerce & Retail",
+        icon: "fa-cart-shopping",
+        desc: "Return refusals, counterfeit items, order cancellations, empty parcels",
+        subIssues: ["Refusal of Returns / Replacements on Defective Goods", "Counterfeit or Fake Products Delivered", "Unilateral Order Cancellation by Seller", "Missing Package Items / Empty Parcel Delivery"]
+      },
+      banking: {
+        title: "Digital Banking & UPI",
+        icon: "fa-building-columns",
+        desc: "Failed UPI debits, ATM failures, card reversal delays & ₹100/day TAT",
+        subIssues: ["Failed UPI / IMPS Debit (Debited but not Credited)", "ATM Cash Dispenser Failure (Cash not dispensed)", "Card POS / Merchant Refund Reversal Failure", "Unauthorized Digital Debits & Hidden Surcharges"]
+      },
+      multiplex: {
+        title: "Cinemas & Multiplexes",
+        icon: "fa-film",
+        desc: "Inordinate show delays, cancellations, recliner downgrades, fee gouging",
+        subIssues: ["Inordinate Show Delay / Screen Disruption", "Unannounced Show Cancellation without Restitution", "Involuntary Recliner / Luxury Seat Downgrade", "Unfair Mandatory Convenience Charges"]
+      },
+      food: {
+        title: "Food Delivery & Dining",
+        icon: "fa-utensils",
+        desc: "Substandard/spoiled meals, non-veg mixups, missing items refused refund",
+        subIssues: ["Substandard, Contaminated or Expired Food", "Wrong Dietary Item Delivered (e.g. Non-Veg for Veg)", "Missing Items in Parcel Refused Refund", "Excessive Delivery Delay Causing Spoiled Food"]
+      },
+      telecom: {
+        title: "Telecom & Broadband",
+        icon: "fa-wifi",
+        desc: "Prolonged fiber broadband outages, unauthorized VAS, disputed bills",
+        subIssues: ["Prolonged Fiber / Broadband Outage (>24-72h)", "Unauthorized Value Added Service (VAS) Deductions", "Refusal to Issue MNP Porting Code", "Disputed Postpaid Charges / Ghost Data Usage"]
+      },
+      metrology: {
+        title: "Dual MRP Violations",
+        icon: "fa-tags",
+        desc: "Selling above printed MRP at airports/malls/theatres, masked stickers",
+        subIssues: ["Overcharging Above Printed MRP (Airports/Theatres/Malls)", "Dual MRP Stickers / Altered Packaging Price", "Mandatory Ancillary Purchase for Base Product"]
+      },
+      mobility: {
+        title: "Cab Aggregators",
+        icon: "fa-taxi",
+        desc: "Driver cancellation penalties, false route surge drift, AC refusal",
+        subIssues: ["Driver Cancellation Fee Imposed on Rider", "Unwarranted GPS Surge / False Route Recalculation", "AC Refusal with Full AC-tier Fare Charged", "Mid-trip Passenger Abandonment by Driver"]
+      },
+      darkpatterns: {
+        title: "CCPA Dark Patterns",
+        icon: "fa-ghost",
+        desc: "Drip pricing, basket sneaking, subscription traps, hidden add-ons",
+        subIssues: ["Drip Pricing (Hidden fees revealed only at final pay)", "Basket Sneaking (Pre-checked add-ons, donations, insurance)", "Subscription Trap (Deceptive or blocked cancellation)", "Forced Bundling of Unwanted Subscriptions"]
+      },
+      custom: {
+        title: "Other / Custom Dispute",
+        icon: "fa-pen-nib",
+        desc: "Custom service deficiency or unfair trade practice under CPA Section 2(11)",
+        subIssues: ["Custom Unfair Trade Practice or Service Deficiency"]
+      }
+    };
+
+    let selectedCategory = null;
+    let selectedSubIssue = null;
+
+    // Render Category Cards
+    function renderCategories() {
+      const grid = document.getElementById("categoryGrid");
+      grid.innerHTML = "";
+      for (const [key, cat] of Object.entries(CATEGORIES)) {
+        const card = document.createElement("div");
+        card.className = "category-card bg-slate-800/70 border border-slate-700/80 rounded-xl p-4 cursor-pointer hover:bg-slate-800";
+        card.id = `cat-${key}`;
+        card.onclick = () => selectCategory(key);
+        card.innerHTML = `
+          <div class="w-8 h-8 rounded-lg bg-sky-950 text-sky-400 flex items-center justify-center mb-3 text-sm">
+            <i class="fa-solid ${cat.icon}"></i>
+          </div>
+          <h4 class="text-xs font-bold text-white mb-1">${cat.title}</h4>
+          <p class="text-[11px] text-slate-400 leading-tight">${cat.desc}</p>
+        `;
+        grid.appendChild(card);
+      }
+    }
+
+    // Handle Category Selection
+    function selectCategory(key) {
+      selectedCategory = key;
+      document.querySelectorAll(".category-card").forEach(c => c.classList.remove("selected"));
+      document.getElementById(`cat-${key}`).classList.add("selected");
+
+      const catData = CATEGORIES[key];
+      const pillsContainer = document.getElementById("subIssuePills");
+      pillsContainer.innerHTML = "";
+
+      if (key === "custom") {
+        document.getElementById("subIssueSection").classList.add("hidden");
+        selectedSubIssue = "Custom Dispute";
+        document.getElementById("intakeSection").classList.remove("hidden");
+        return;
+      }
+
+      catData.subIssues.forEach((issue, idx) => {
+        const pill = document.createElement("button");
+        pill.type = "button";
+        pill.className = `subissue-pill text-xs px-3.5 py-1.5 rounded-full border border-slate-700 bg-slate-900 text-slate-300 hover:border-sky-400 ${idx === 0 ? 'active' : ''}`;
+        pill.textContent = issue;
+        pill.onclick = () => {
+          document.querySelectorAll(".subissue-pill").forEach(p => p.classList.remove("active"));
+          pill.classList.add("active");
+          selectedSubIssue = issue;
+          document.getElementById("intakeSection").classList.remove("hidden");
         };
+        pillsContainer.appendChild(pill);
+      });
 
-        document.getElementById("disp-date").value = new Date().toISOString().split('T')[0];
+      selectedSubIssue = catData.subIssues[0];
+      document.getElementById("subIssueSection").classList.remove("hidden");
+      document.getElementById("intakeSection").classList.remove("hidden");
+    }
 
-        function checkUserSession() {
-            if (currentUser) {
-                document.getElementById("auth-nav-box").innerHTML = `
-                    <div class="flex items-center space-x-2 text-xs">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                        <span class="font-medium text-slate-200">${currentUser.full_name}</span>
-                        <span class="text-slate-500 font-mono">(${currentUser.upi_id})</span>
-                        <button onclick="logout()" class="text-slate-400 hover:text-red-400 ml-2"><i class="fa-solid fa-right-from-bracket"></i></button>
-                    </div>
-                `;
-                fetchDashboard();
-            }
+    // Background Telemetry Trigger (No front UI clutter)
+    function captureTelemetryInBackground() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            document.getElementById("gpsTelemetry").value = `${pos.coords.latitude.toFixed(4)}° N, ${pos.coords.longitude.toFixed(4)}° E`;
+          },
+          () => {} // Silent failover to default coordinates
+        );
+      }
+    }
+
+    // Step 2 & 3: Contextual Legal Analysis Engine
+    async function analyzeGrievance() {
+      const narrative = document.getElementById("narrativeInput").value.trim();
+      if (!narrative) {
+        alert("Please describe what occurred in the problem box.");
+        return;
+      }
+
+      captureTelemetryInBackground();
+      const btn = document.getElementById("btnAnalyze");
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing Laws & Evidence...`;
+
+      try {
+        const res = await fetch("/api/analyze-grievance", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            category: selectedCategory,
+            sub_issue: selectedSubIssue,
+            narrative: narrative
+          })
+        });
+        const data = await res.json();
+
+        // Render AI Findings
+        document.getElementById("analysisEntityTitle").textContent = `Opposite Commercial Party: ${data.entity}`;
+        document.getElementById("oppositeParty").value = data.entity;
+
+        const lawsList = document.getElementById("lawsList");
+        lawsList.innerHTML = data.applicable_laws.map(l => `<li>&bull; ${l}</li>`).join("");
+
+        const violationsList = document.getElementById("violationsList");
+        violationsList.innerHTML = data.violations.map(v => `<li>&bull; ${v}</li>`).join("");
+        document.getElementById("violationSummary").value = data.violations.join("; ");
+        document.getElementById("statutoryPenalty").value = data.suggested_statutory_penalty;
+
+        // Render Contextual Targeted Evidence Checklist
+        const evidenceContainer = document.getElementById("evidenceCards");
+        evidenceContainer.innerHTML = "";
+        data.evidence_checklist.forEach(doc => {
+          const card = document.createElement("div");
+          card.className = "bg-slate-900 border border-slate-700 rounded-lg p-3.5 flex flex-col justify-between";
+          card.innerHTML = `
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-bold text-white">${doc.title}</span>
+                <span class="text-[10px] px-2 py-0.5 rounded font-mono ${doc.required ? 'bg-rose-950 text-rose-300 border border-rose-800' : 'bg-slate-800 text-slate-400'}">${doc.required ? 'Mandatory' : 'Optional'}</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mb-3">${doc.desc}</p>
+            </div>
+            <div class="flex space-x-2">
+              <button type="button" onclick="triggerEvidenceUpload('${doc.id}', true)" class="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs py-1.5 rounded flex items-center justify-center space-x-1">
+                <i class="fa-solid fa-camera text-[10px]"></i> <span>Live Photo</span>
+              </button>
+              <button type="button" onclick="triggerEvidenceUpload('${doc.id}', false)" class="flex-1 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs py-1.5 rounded flex items-center justify-center space-x-1">
+                <i class="fa-solid fa-paperclip text-[10px]"></i> <span>Upload PDF/Doc</span>
+              </button>
+            </div>
+          `;
+          evidenceContainer.appendChild(card);
+        });
+
+        document.getElementById("aiAnalysisCard").classList.remove("hidden");
+        document.getElementById("incidentDate").value = new Date().toISOString().split("T")[0];
+
+      } catch (err) {
+        alert("Unable to analyze grievance. Please try again.");
+      } finally {
+        btn.innerHTML = `<i class="fa-solid fa-brain text-sky-200"></i> <span>Re-Analyze Grievance</span>`;
+      }
+    }
+
+    function triggerEvidenceUpload(docId, isCamera) {
+      const fileInput = document.getElementById("evidenceFileInput");
+      if (isCamera) {
+        fileInput.setAttribute("capture", "environment");
+      } else {
+        fileInput.removeAttribute("capture");
+      }
+      fileInput.click();
+      fileInput.onchange = () => {
+        if (fileInput.files.length > 0) {
+          alert(`Evidence captured: ${fileInput.files[0].name} (Forensic SHA-256 seal will be generated on compilation)`);
         }
+      };
+    }
 
-        function onCategoryChange() {
-            const cat = document.getElementById("disp-category").value;
-            const text = statutoryGuidance[cat] || statutoryGuidance["Universal Consumer Service Deficiency"];
-            document.getElementById("statutory-proof-text").innerHTML = text;
-            updateCalculations();
-        }
+    // Submit Dispute & Generate Notice
+    async function submitDispute(e) {
+      e.preventDefault();
+      const btn = document.getElementById("btnSubmitNotice");
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Hashing Evidence & Compiling Section 65B Notice...`;
 
-        function checkNCHConvergence() {
-            const val = document.getElementById("disp-respondent").value.toLowerCase();
-            const badge = document.getElementById("convergence-badge");
-            const isMatch = convergenceList.some(p => val.includes(p));
-            badge.classList.toggle("hidden", !isMatch);
-        }
+      const formData = new FormData();
+      formData.append("consumer_name", document.getElementById("consumerName").value);
+      formData.append("consumer_upi", document.getElementById("consumerUpi").value);
+      formData.append("consumer_phone", document.getElementById("consumerPhone").value);
+      formData.append("category", selectedCategory);
+      formData.append("sub_issue", selectedSubIssue);
+      formData.append("opposite_party", document.getElementById("oppositeParty").value);
+      formData.append("reference_id", document.getElementById("referenceId").value);
+      formData.append("incident_date", document.getElementById("incidentDate").value);
+      formData.append("principal_amount", document.getElementById("principalAmount").value);
+      formData.append("statutory_penalty", document.getElementById("statutoryPenalty").value || "0");
+      formData.append("narrative", document.getElementById("narrativeInput").value);
+      formData.append("legal_violations", document.getElementById("violationSummary").value);
+      formData.append("gps_coordinates", document.getElementById("gpsTelemetry").value);
 
-        function toggleDarkPatternSelect() {
-            const chk = document.getElementById("dark-pattern-toggle").checked;
-            document.getElementById("dark-pattern-type").classList.toggle("hidden", !chk);
-        }
+      const fileInput = document.getElementById("evidenceFileInput");
+      if (fileInput.files.length > 0) {
+        formData.append("evidence_file", fileInput.files[0]);
+      }
 
-        async function handleEvidenceUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+      try {
+        const res = await fetch("/api/create-dispute", {
+          method: "POST",
+          body: formData
+        });
+        const result = await res.json();
 
-            const scanBox = document.getElementById("ai-scan-box");
-            const scanTitle = document.getElementById("ai-scan-title");
-            const scanDesc = document.getElementById("ai-scan-desc");
-            const scanHash = document.getElementById("ai-scan-hash");
-            const auditBadge = document.getElementById("evidence-audit-badge");
+        // Reveal Success Card & Links
+        document.getElementById("docketSubtitle").textContent = `Pre-Litigation Action Docket: ${result.dispute_id}`;
+        document.getElementById("docketTotalDemand").textContent = `₹ ${result.total_demand.toLocaleString('en-IN')}`;
+        document.getElementById("docketHash").textContent = result.evidence_hash;
+        document.getElementById("docketDeadline").textContent = result.cure_deadline;
+        
+        document.getElementById("btnDownloadNotice").href = result.pdf_url;
+        document.getElementById("btnOpenSettlementDesk").href = result.settle_url;
 
-            scanBox.className = "p-3 rounded-xl border border-indigo-500/40 bg-indigo-950/20 font-mono text-[11px] space-y-1 block";
-            scanTitle.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-indigo-400"></i> AI Document Forensics in progress...`;
-            scanDesc.innerText = `Extracting invoice amounts, inspecting digital artifacts, and calculating SHA-256 evidence digest...`;
+        document.getElementById("intakeSection").classList.add("hidden");
+        document.getElementById("successCard").classList.remove("hidden");
+        document.getElementById("activeClaimsCounter").textContent = "1";
 
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("respondent", document.getElementById("disp-respondent").value);
-            formData.append("category", document.getElementById("disp-category").value);
+        window.scrollTo({ top: document.getElementById("successCard").offsetTop - 50, behavior: 'smooth' });
 
-            try {
-                const res = await fetch("/api/verify-evidence", {
-                    method: "POST",
-                    body: formData
-                });
-                const data = await res.json();
+      } catch (err) {
+        alert("Failed to compile pre-litigation docket.");
+      } finally {
+        btn.innerHTML = `<i class="fa-solid fa-file-shield text-base"></i> <span>Compile Statutory Section 65B Notice & Initiate 7-Day Cure Window</span>`;
+      }
+    }
 
-                if (!data.valid) {
-                    scanBox.className = "p-3 rounded-xl border border-red-500/40 bg-red-950/20 font-mono text-[11px] space-y-1 block";
-                    scanTitle.innerHTML = `<span class="text-red-400 font-bold">❌ Forensic Audit Rejected: Unrelated or Invalid Document</span>`;
-                    scanDesc.innerText = data.reason || "The uploaded file does not appear to be a genuine invoice/ticket. Please provide a clear document.";
-                    auditBadge.classList.add("hidden");
-                    return;
-                }
-
-                verifiedEvidenceHash = data.hash;
-                forensicStatus = data.verdict || "VERIFIED_AUTHENTIC";
-
-                scanBox.className = "p-3 rounded-xl border border-emerald-500/40 bg-emerald-950/20 font-mono text-[11px] space-y-1 block";
-                scanTitle.innerHTML = `<span class="text-emerald-400 font-bold">✓ AI Forensic Audit Passed (${forensicStatus})</span>`;
-                scanHash.innerText = `SHA-256: ${verifiedEvidenceHash.substring(0, 16)}...`;
-                scanDesc.innerText = `${data.audit_notes} Automatically populated verified invoice amount and transaction date.`;
-
-                auditBadge.classList.remove("hidden");
-
-                if (data.extracted_amount && data.extracted_amount > 0) {
-                    document.getElementById("disp-amount").value = data.extracted_amount;
-                }
-                if (data.detected_date) {
-                    document.getElementById("disp-date").value = data.detected_date;
-                }
-                updateCalculations();
-            } catch (err) {
-                scanBox.className = "p-3 rounded-xl border border-amber-500/40 bg-amber-950/20 font-mono text-[11px] space-y-1 block";
-                scanTitle.innerHTML = `<span class="text-amber-400 font-bold">✓ Stamped Cryptographic Digest</span>`;
-                scanDesc.innerText = "Evidence digest locked. Proceeding with statutory filing.";
-            }
-        }
-
-        function updateCalculations() {
-            const cat = document.getElementById("disp-category").value.toLowerCase();
-            const amt = parseFloat(document.getElementById("disp-amount").value) || 0.0;
-            const incDate = new Date(document.getElementById("disp-date").value);
-            const today = new Date();
-            const daysPassed = Math.max(1, Math.floor((today - incDate)/(1000*60*60*24)));
-
-            let stat = 0.0;
-            // Strict Government Rules
-            if (cat.includes("banking") || cat.includes("upi")) {
-                const tat = cat.includes("upi") ? 1 : 5;
-                stat = Math.max(0, daysPassed - tat) * 100.0;
-            } else if (cat.includes("aviation") || cat.includes("flight")) {
-                stat = Math.min(10000.0, Math.max(5000.0, Math.round(amt * 0.8)));
-            } else if (cat.includes("railway") || cat.includes("train")) {
-                stat = amt;
-            } else if (cat.includes("cinema") || cat.includes("movie")) {
-                stat = Math.round(amt * 0.5 + 1000.0);
-            } else if (cat.includes("telecom") || cat.includes("broadband")) {
-                stat = Math.round(Math.min(amt, (amt / 30) * daysPassed));
-            } else if (cat.includes("food")) {
-                stat = amt;
-            } else if (cat.includes("cab") || cat.includes("ride")) {
-                stat = 750.0;
-            } else if (cat.includes("metrology") || cat.includes("mrp")) {
-                stat = 2000.0;
-            } else if (cat.includes("insurance")) {
-                stat = 5000.0;
-            } else if (cat.includes("hospital") || cat.includes("medical")) {
-                stat = 3500.0;
-            } else if (cat.includes("edtech") || cat.includes("coaching")) {
-                stat = Math.round(amt * 0.5 + 2000.0);
-            } else if (cat.includes("real estate")) {
-                stat = 10000.0;
-            }
-
-            const interest = Math.round(amt * (0.12 / 365) * daysPassed);
-            const total = amt + stat + interest + 1500.0;
-            const userPayout = amt + stat + interest; // 100% User Restitution
-
-            document.getElementById("calc-principal").innerText = "₹" + amt.toLocaleString();
-            document.getElementById("calc-statutory").innerText = "₹" + stat.toLocaleString();
-            document.getElementById("calc-interest").innerText = "₹" + interest.toLocaleString();
-            document.getElementById("calc-total").innerText = "₹" + total.toLocaleString();
-            document.getElementById("calc-payout").innerText = "₹" + userPayout.toLocaleString();
-        }
-
-        function stampGPS() {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                    gpsData = `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
-                    document.getElementById("gps-log").innerHTML = `<span class="text-emerald-400">✓ Coordinates:</span> ${gpsData}`;
-                },
-                () => { document.getElementById("gps-log").innerText = "GPS access denied."; }
-            );
-        }
-
-        async function stampNetwork() {
-            const start = Date.now();
-            await fetch("/");
-            const lat = Date.now() - start;
-            networkData = `${lat}ms latency`;
-            document.getElementById("network-log").innerHTML = `<span class="text-emerald-400">✓ Diagnostic:</span> ${lat}ms RTT`;
-        }
-
-        async function submitDispute() {
-            if (!currentUser) return openAuthModal();
-            if (!verifiedEvidenceHash) {
-                return alert("Please take a live photo or upload your ticket/invoice first so our AI engine can verify the proof.");
-            }
-            if (!document.getElementById("clean-hands-check").checked) {
-                return alert("Clean hands declaration required.");
-            }
-
-            const payload = {
-                user_email: currentUser.email,
-                respondent_name: document.getElementById("disp-respondent").value || "Respondent Entity",
-                sector_category: document.getElementById("disp-category").value,
-                incident_date: document.getElementById("disp-date").value,
-                invoice_amount: parseFloat(document.getElementById("disp-amount").value) || 1000.0,
-                narrative: document.getElementById("disp-narrative").value || "Statutory deficiency under Indian consumer law.",
-                dark_pattern: document.getElementById("dark-pattern-toggle").checked,
-                dark_pattern_type: document.getElementById("dark-pattern-type").value,
-                gps_log: gpsData,
-                network_log: networkData,
-                evidence_hash: verifiedEvidenceHash,
-                ai_forensic_report: forensicStatus
-            };
-
-            await fetch("/api/audit-and-file", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(payload)
-            });
-            fetchDashboard();
-        }
-
-        async function fetchDashboard() {
-            if (!currentUser) return;
-            const res = await fetch(`/api/dashboard/${currentUser.email}`);
-            const data = await res.json();
-
-            document.getElementById("metric-recovered").innerText = "₹" + data.total_recovered.toLocaleString();
-            document.getElementById("metric-active").innerText = data.active_disputes;
-
-            const box = document.getElementById("cases-container");
-            if (data.claims.length === 0) {
-                box.innerHTML = `<div class="text-xs text-slate-400 p-6 text-center border border-dashed border-slate-800 rounded-xl">No active claims found.</div>`;
-                return;
-            }
-
-            box.innerHTML = data.claims.map(c => `
-                <div class="bg-slate-950 border border-slate-800 p-5 rounded-2xl space-y-4">
-                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                        <div>
-                            <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">${c.case_ref}</span>
-                            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${c.forensic_status}</span>
-                            ${c.is_nch_partner ? '<span class="text-[10px] ml-1 px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">NCH Partner</span>' : ''}
-                            ${c.dark_pattern ? '<span class="text-[10px] ml-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">CCPA Dark Pattern</span>' : ''}
-                            <h3 class="font-bold text-white text-sm mt-1">${c.respondent} • <span class="text-xs text-slate-400 font-normal">${c.sector}</span></h3>
-                            <p class="text-[10px] text-amber-400 mt-0.5 font-mono">Act: ${c.governing_acts}</p>
-                        </div>
-                        <div class="text-right">
-                            <span class="text-xs font-bold text-emerald-400">Total Demand: ₹${c.total_claim.toLocaleString()}</span>
-                            <p class="text-[10px] text-emerald-300 font-bold">100% to You: ₹${c.user_payout.toLocaleString()}</p>
-                        </div>
-                    </div>
-
-                    ${c.apology_text ? `
-                        <div class="p-3.5 bg-indigo-950/40 border border-indigo-500/30 rounded-xl text-xs space-y-1">
-                            <div class="flex items-center space-x-1.5 font-bold text-indigo-300">
-                                <i class="fa-solid fa-certificate text-emerald-400"></i>
-                                <span>Official Corporate Apology & Admission of Deficiency</span>
-                            </div>
-                            <p class="text-slate-300 italic">"${c.apology_text}"</p>
-                            <p class="text-[10px] text-slate-400 pt-0.5">— Signed: ${c.apology_officer || 'Designated Grievance Desk'}</p>
-                        </div>
-                    ` : ''}
-
-                    <div class="grid grid-cols-3 gap-2 text-center text-[11px] font-medium pt-1">
-                        <div class="p-2 rounded-xl ${c.stage === 'STAGE_1_NOTICE' ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30' : 'bg-slate-900 text-slate-500'}">
-                            Stage 1: Notice (${c.days_left}d cure)
-                        </div>
-                        <div class="p-2 rounded-xl ${c.stage === 'STAGE_2_NCH' ? 'bg-amber-600/20 text-amber-300 border border-amber-500/30' : 'bg-slate-900 text-slate-500'}">
-                            Stage 2: NCH (1915)
-                        </div>
-                        <div class="p-2 rounded-xl ${c.stage === 'STAGE_3_COURT' ? 'bg-red-600/20 text-red-300 border border-red-500/30' : 'bg-slate-900 text-slate-500'}">
-                            Stage 3: e-Daakhil
-                        </div>
-                    </div>
-
-                    <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
-                        <div class="flex items-center space-x-2">
-                            <a href="${c.pdf_url}" target="_blank" class="py-2 px-3 bg-slate-900 border border-slate-700 text-xs font-semibold rounded-xl flex items-center space-x-1">
-                                <i class="fa-solid fa-file-pdf text-red-400"></i>
-                                <span>Legal Notice</span>
-                            </a>
-                            <a href="${c.settle_link}" target="_blank" class="py-2 px-3 bg-emerald-600/20 border border-emerald-500/30 text-emerald-300 text-xs font-semibold rounded-xl">
-                                Corporate Settlement Desk
-                            </a>
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            ${c.stage === 'STAGE_1_NOTICE' ? `<button onclick="escalateNCH('${c.case_ref}')" class="py-2 px-3 bg-amber-600/20 text-amber-300 border border-amber-500/30 text-xs font-semibold rounded-xl">Escalate to NCH</button>` : ''}
-                            ${c.stage === 'STAGE_2_NCH' ? `<button onclick="escalateCourt('${c.case_ref}')" class="py-2 px-3 bg-red-600/20 text-red-300 border border-red-500/30 text-xs font-semibold rounded-xl">Compile Court Petition</button>` : ''}
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        async function escalateNCH(ref) { await fetch(`/api/escalate-nch/${ref}`, { method: "POST" }); fetchDashboard(); }
-        async function escalateCourt(ref) { await fetch(`/api/escalate-court/${ref}`, { method: "POST" }); fetchDashboard(); }
-        function openAuthModal() { document.getElementById("auth-modal").classList.remove("hidden"); }
-        function closeAuthModal() { document.getElementById("auth-modal").classList.add("hidden"); }
-        async function submitAuth() {
-            const payload = {
-                full_name: document.getElementById("auth-name").value,
-                email: document.getElementById("auth-email").value,
-                phone: document.getElementById("auth-phone").value,
-                pincode: document.getElementById("auth-pincode").value,
-                upi_id: document.getElementById("auth-upi").value
-            };
-            const res = await fetch("/api/register", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(payload)
-            });
-            currentUser = await res.json();
-            localStorage.setItem("refundr_user", JSON.stringify(currentUser));
-            closeAuthModal();
-            checkUserSession();
-        }
-        function logout() { localStorage.removeItem("refundr_user"); location.reload(); }
-
-        checkUserSession();
-        onCategoryChange();
-    </script>
+    // Initialize Dashboard
+    window.onload = renderCategories;
+  </script>
 </body>
 </html>

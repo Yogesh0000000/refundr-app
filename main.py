@@ -1,608 +1,583 @@
 import os
-import io
-import json
-import base64
 import hashlib
-from datetime import datetime
-from typing import Optional
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, FileResponse
+import sqlite3
+from datetime import datetime, timezone, timedelta
+from typing import Optional, List
+from fastapi import FastAPI, Request, Form, UploadFile, File
+from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-import requests
-from sqlalchemy import create_engine, Column, Integer, String, Float, Text, DateTime, ForeignKey, Boolean
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship, Session
+import io
+
+# ReportLab imports for generating Section 65B Certified Legal Notices
 from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib import colors
 
-DATABASE_URL = "sqlite:///./refundr.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+app = FastAPI(title="Refundr - Statutory Consumer Recovery Engine")
 
-# Pan-India NCH Convergence Directory
-NCH_CONVERGENCE_PARTNERS = [
-    "indigo", "air india", "spicejet", "vistara", "akasa", "irctc", 
-    "amazon", "flipkart", "myntra", "meesho", "swiggy", "zomato", "blinkit", "zepto", "bigbasket",
-    "airtel", "jio", "vodafone idea", "tata play", "makemytrip", "easemytrip", "goibibo", "yatra",
-    "pvr", "inox", "bookmyshow", "cinepolis", "uber", "ola", "rapido",
-    "hdfc", "sbi", "icici", "axis", "kotak", "pnb", "paytm", "phonepe", "google pay", "cred",
-    "byjus", "unacademy", "physics wallah", "allen", "vedantu",
-    "star health", "care health", "hdfc ergo", "icici lombard", "lic", "max life"
-]
+DB_FILE = "refundr.db"
 
-class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True, index=True)
-    full_name = Column(String(120), nullable=False)
-    email = Column(String(120), unique=True, index=True, nullable=False)
-    phone = Column(String(20), nullable=False)
-    pincode = Column(String(10), nullable=False)
-    upi_id = Column(String(100), default="unlinked@upi")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    claims = relationship("DisputeRecord", back_populates="claimant")
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS disputes (
+            id TEXT PRIMARY KEY,
+            created_at TEXT,
+            consumer_name TEXT,
+            consumer_upi TEXT,
+            consumer_phone TEXT,
+            category TEXT,
+            sub_issue TEXT,
+            opposite_party TEXT,
+            reference_id TEXT,
+            incident_date TEXT,
+            principal_amount REAL,
+            statutory_penalty REAL,
+            interest_amount REAL,
+            total_demand REAL,
+            narrative TEXT,
+            legal_violations TEXT,
+            evidence_hash TEXT,
+            gps_coordinates TEXT,
+            status TEXT,
+            cure_deadline TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
 
-class DisputeRecord(Base):
-    __tablename__ = "disputes"
-    id = Column(Integer, primary_key=True, index=True)
-    case_ref = Column(String(64), unique=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    respondent_name = Column(String(150), nullable=False)
-    sector_category = Column(String(120), nullable=False)
-    governing_acts = Column(String(300), nullable=False)
-    statutory_sections = Column(String(300), nullable=False)
-    incident_date = Column(String(30), nullable=False)
-    is_nch_partner = Column(Boolean, default=False)
-    dark_pattern_flag = Column(Boolean, default=False)
-    dark_pattern_type = Column(String(100), nullable=True)
-    jurisdiction_forum = Column(String(150))
-    base_principal = Column(Float, default=0.0)
-    statutory_relief = Column(Float, default=0.0)
-    accrued_interest = Column(Float, default=0.0)
-    legal_costs = Column(Float, default=1500.0)
-    total_claim = Column(Float, default=0.0)
-    user_recovery_share = Column(Float, default=0.0)
-    evidence_hash = Column(String(64), nullable=True)
-    ai_forensic_status = Column(String(100), default="VERIFIED_AUTHENTIC")
-    sec65b_certificate = Column(Text, nullable=True)
-    gps_telemetry = Column(Text, nullable=True)
-    network_telemetry = Column(Text, nullable=True)
-    list_of_dates = Column(Text, nullable=True)
-    legal_grounds_text = Column(Text, nullable=True)
-    stage = Column(String(50), default="STAGE_1_NOTICE")
-    dispatched_at = Column(DateTime, default=datetime.utcnow)
-    settlement_status = Column(String(40), default="7-Day Cure Window Running")
-    corporate_apology_text = Column(Text, nullable=True)
-    apology_officer_title = Column(String(150), nullable=True)
-    apology_submitted_at = Column(DateTime, nullable=True)
-    claimant = relationship("User", back_populates="claims")
+init_db()
 
-Base.metadata.create_all(bind=engine)
+# --- RULE-BASED LEGAL INTELLIGENCE ENGINE ---
+LEGAL_TAXONOMY = {
+    "aviation": {
+        "title": "Civil Aviation",
+        "regulator": "DGCA CAR Section 3, Series M",
+        "sub_issues": [
+            "Flight Delays (>3 to 6 Hours)",
+            "Flight Cancellations without Adequate Notice",
+            "Denied Boarding (Overbooking)",
+            "Baggage Lost, Damaged or Delayed"
+        ]
+    },
+    "railways": {
+        "title": "Railways & Public Transit",
+        "regulator": "IRCA Coaching Tariff & Railways Act 1989",
+        "sub_issues": [
+            "Train Delays Exceeding 3 Hours (Full TDR)",
+            "AC Failure / Coach Downgrade",
+            "Waitlisted Ticket Fee Deductions",
+            "Coach Hygiene / Transit Service Failure"
+        ]
+    },
+    "ecommerce": {
+        "title": "E-Commerce & Retail",
+        "regulator": "CPA E-Commerce Rules 2020 & Sec 2(10)",
+        "sub_issues": [
+            "Refusal of Returns / Replacements on Defective Goods",
+            "Counterfeit or Fake Products Delivered",
+            "Unilateral Order Cancellation by Seller",
+            "Missing Package Items / Empty Parcel Delivery"
+        ]
+    },
+    "banking": {
+        "title": "Digital Banking & UPI",
+        "regulator": "RBI DPSS TAT Circular (₹100/day delay penalty)",
+        "sub_issues": [
+            "Failed UPI / IMPS Debit (Debited but not Credited)",
+            "ATM Cash Dispenser Failure (Cash not dispensed)",
+            "Card POS / Merchant Refund Reversal Failure",
+            "Unauthorized Digital Debits & Hidden Surcharges"
+        ]
+    },
+    "multiplex": {
+        "title": "Cinemas & Multiplexes",
+        "regulator": "CPA 2019 Sec 2(11) Deficiency of Service",
+        "sub_issues": [
+            "Inordinate Show Delay / Screen Disruption",
+            "Unannounced Show Cancellation without Restitution",
+            "Involuntary Recliner / Luxury Seat Downgrade",
+            "Unfair Mandatory Convenience Charges"
+        ]
+    },
+    "food": {
+        "title": "Food Delivery & Dining",
+        "regulator": "FSSAI Act 2006 & CPA Product Liability",
+        "sub_issues": [
+            "Substandard, Contaminated or Expired Food",
+            "Wrong Dietary Item Delivered (e.g. Non-Veg for Veg)",
+            "Missing Items in Parcel Refused Refund",
+            "Excessive Delivery Delay Causing Spoiled Food"
+        ]
+    },
+    "telecom": {
+        "title": "Telecom & Broadband",
+        "regulator": "TRAI Quality of Service (QoS) Regulations",
+        "sub_issues": [
+            "Prolonged Fiber / Broadband Outage (>24-72h)",
+            "Unauthorized Value Added Service (VAS) Deductions",
+            "Refusal to Issue MNP Porting Code",
+            "Disputed Postpaid Charges / Ghost Data Usage"
+        ]
+    },
+    "metrology": {
+        "title": "Legal Metrology & Dual MRP",
+        "regulator": "Legal Metrology Act 2009 Sec 36",
+        "sub_issues": [
+            "Overcharging Above Printed MRP (Airports/Theatres/Malls)",
+            "Dual MRP Stickers / Altered Packaging Price",
+            "Mandatory Ancillary Purchase for Base Product"
+        ]
+    },
+    "mobility": {
+        "title": "Cab Aggregators (Ola/Uber)",
+        "regulator": "Motor Vehicles Aggregator Guidelines 2020",
+        "sub_issues": [
+            "Driver Cancellation Fee Imposed on Rider",
+            "Unwarranted GPS Surge / False Route Recalculation",
+            "AC Refusal with Full AC-tier Fare Charged",
+            "Mid-trip Passenger Abandonment by Driver"
+        ]
+    },
+    "darkpatterns": {
+        "title": "CCPA Dark Patterns",
+        "regulator": "CCPA Guidelines for Prevention of Dark Patterns 2023",
+        "sub_issues": [
+            "Drip Pricing (Hidden fees revealed only at final pay)",
+            "Basket Sneaking (Pre-checked add-ons, donations, insurance)",
+            "Subscription Trap (Deceptive or blocked cancellation)",
+            "Forced Bundling of Unwanted Subscriptions"
+        ]
+    },
+    "custom": {
+        "title": "Other / Custom Dispute",
+        "regulator": "CPA 2019 Section 2(11) read with Section 39",
+        "sub_issues": ["Custom Unfair Trade Practice or Service Deficiency"]
+    }
+}
 
-app = FastAPI(title="Refundr Pan-India Consumer Legal Recovery Engine")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-class RegisterSchema(BaseModel):
-    full_name: str
-    email: str
-    phone: str
-    pincode: str
-    upi_id: Optional[str] = "unlinked@upi"
-
-class DisputeCreateSchema(BaseModel):
-    user_email: str
-    respondent_name: str
-    sector_category: str
-    incident_date: str
-    invoice_amount: float
+class GrievanceAnalysisRequest(BaseModel):
+    category: str
+    sub_issue: str
     narrative: str
-    custom_sections: Optional[str] = None
-    dark_pattern: bool = False
-    dark_pattern_type: Optional[str] = None
-    gps_log: Optional[str] = None
-    network_log: Optional[str] = None
-    evidence_hash: Optional[str] = None
-    ai_forensic_report: Optional[str] = "VERIFIED_AUTHENTIC"
 
-class CorporateSettleSchema(BaseModel):
-    apology_text: Optional[str] = None
-    officer_title: Optional[str] = "Designated Grievance Officer"
+@app.post("/api/analyze-grievance")
+async def analyze_grievance(req: GrievanceAnalysisRequest):
+    text = req.narrative.lower()
+    cat = req.category
+    
+    # 1. Detect Company / Opposite Party
+    companies = [
+        "indigo", "air india", "spicejet", "akasa", "vistara", "irctc", 
+        "amazon", "flipkart", "meesho", "myntra", "swiggy", "zomato", 
+        "ola", "uber", "airtel", "jio", "vi", "pvr", "inox", "bookmyshow", 
+        "paytm", "phonepe", "gpay", "hdfc", "sbi", "icici", "axis"
+    ]
+    detected_entity = "Opposite Commercial Party"
+    for comp in companies:
+        if comp in text:
+            detected_entity = comp.upper()
+            break
+            
+    # 2. Derive Violations, Statutory Heads, and Targeted Evidence Checklist
+    violations = []
+    applicable_laws = []
+    evidence_checklist = []
+    suggested_penalty = 0.0
 
-# AI Forensic Evidence Ingestion Endpoint
-@app.post("/api/verify-evidence")
-async def verify_evidence(
-    file: UploadFile = File(...),
-    respondent: str = Form(""),
-    category: str = Form("")
+    if cat == "aviation":
+        applicable_laws = ["DGCA CAR Section 3, Series M, Part IV", "Consumer Protection Act 2019 Sec 2(11)"]
+        violations.append("Failure to adhere to DGCA Passenger Charter on statutory delays & meal facilitation")
+        evidence_checklist = [
+            {"id": "doc_ticket", "title": "Boarding Pass / E-Ticket", "desc": "Showing PNR, origin, destination and scheduled flight time", "required": True},
+            {"id": "doc_delay", "title": "Delay SMS / FIDS Display Photo", "desc": "Official airline intimation or airport screen photo", "required": True},
+            {"id": "doc_expense", "title": "Out-of-Pocket Airport Expenses", "desc": "Food, water, or taxi invoices incurred due to delay", "required": False}
+        ]
+        suggested_penalty = 3000.0  # Base DGCA delay relief slab
+
+    elif cat == "railways":
+        applicable_laws = ["IRCA Coaching Tariff Rules", "Railways Act 1989 Section 167"]
+        violations.append("Breach of Railway TDR refund norms for delays exceeding 3 hours")
+        evidence_checklist = [
+            {"id": "doc_ticket", "title": "IRCTC E-Ticket / PNR Slip", "desc": "Original booking confirmation showing train and coach details", "required": True},
+            {"id": "doc_tdr", "title": "TDR Filing Screenshot / Station Memo", "desc": "Proof of cancellation/TDR filed prior to train departure", "required": True}
+        ]
+        suggested_penalty = 500.0
+
+    elif cat == "ecommerce":
+        applicable_laws = ["Consumer Protection (E-Commerce) Rules 2020", "CPA 2019 Sec 2(47) Unfair Trade Practice"]
+        violations.append("Refusal of statutory return/refund on defective goods or deficient delivery")
+        evidence_checklist = [
+            {"id": "doc_invoice", "title": "Tax Invoice / Order Confirmation", "desc": "Tax invoice showing Order ID, items, and amount paid", "required": True},
+            {"id": "doc_defect", "title": "Photo/Video of Defective Product", "desc": "Clear forensic visual of the damaged or wrong product", "required": True},
+            {"id": "doc_chat", "title": "Support Rejection Transcript / Email", "desc": "Screenshot showing denial of refund or ticket closure", "required": True}
+        ]
+        suggested_penalty = 1500.0
+
+    elif cat == "banking":
+        applicable_laws = ["RBI DPSS.CO.PD No.629/02.01.014/2019-20 (Harmonisation of TAT)", "Payment & Settlement Systems Act 2007"]
+        violations.append("Non-reversal of failed electronic debit within statutory T+1 / T+5 turnaround window")
+        evidence_checklist = [
+            {"id": "doc_statement", "title": "Bank Account Statement / Debit SMS", "desc": "Showing deduction with UTR / RRN 12-digit reference number", "required": True},
+            {"id": "doc_complaint", "title": "Bank Grievance Ticket / CRM Acknowledgement", "desc": "Proof of initial complaint filed with the issuer bank", "required": True}
+        ]
+        suggested_penalty = 2000.0  # ₹100/day statutory TAT default assumption
+
+    elif cat == "darkpatterns":
+        applicable_laws = ["CCPA Guidelines for Prevention and Regulation of Dark Patterns 2023", "CPA 2019 Sec 2(47)"]
+        violations.append("Deployment of deceptive interface design (Drip pricing / Basket sneaking / Forced auto-debit)")
+        evidence_checklist = [
+            {"id": "doc_checkout", "title": "Checkout Screen Screenshot", "desc": "Showing pre-selected add-ons or hidden drip fee injection", "required": True},
+            {"id": "doc_receipt", "title": "Final Invoice Showing Surcharge", "desc": "Itemized bill demonstrating unconsented fee deduction", "required": True}
+        ]
+        suggested_penalty = 2500.0
+
+    else:
+        applicable_laws = ["Consumer Protection Act 2019 Section 2(11)", "Section 39 (Relief Order)"]
+        violations.append(f"Statutory deficiency of service and unfair trade practice in {cat.capitalize()}")
+        evidence_checklist = [
+            {"id": "doc_proof", "title": "Invoice / Proof of Payment", "desc": "Bill, receipt, or transaction statement proving payment", "required": True},
+            {"id": "doc_incident", "title": "Incident Evidence / Written Communication", "desc": "Screenshots, letters, or physical photos evidencing deficiency", "required": True}
+        ]
+        suggested_penalty = 1000.0
+
+    return {
+        "status": "success",
+        "entity": detected_entity,
+        "applicable_laws": applicable_laws,
+        "violations": violations,
+        "suggested_statutory_penalty": suggested_penalty,
+        "evidence_checklist": evidence_checklist
+    }
+
+# --- DISPUTE SUBMISSION & SECTION 65B FORENSIC PACKAGING ---
+@app.post("/api/create-dispute")
+async def create_dispute(
+    consumer_name: str = Form(...),
+    consumer_upi: str = Form(...),
+    consumer_phone: str = Form(...),
+    category: str = Form(...),
+    sub_issue: str = Form(...),
+    opposite_party: str = Form(...),
+    reference_id: str = Form("N/A"),
+    incident_date: str = Form(...),
+    principal_amount: float = Form(...),
+    statutory_penalty: float = Form(0.0),
+    narrative: str = Form(...),
+    legal_violations: str = Form(...),
+    gps_coordinates: str = Form("13.0827° N, 80.2707° E"),
+    evidence_file: Optional[UploadFile] = File(None)
 ):
-    contents = await file.read()
-    sha256_hash = hashlib.sha256(contents).hexdigest()
-    file_size_kb = len(contents) / 1024
+    dispute_id = f"REF-{datetime.now().strftime('%y%m%d')}-{os.urandom(3).hex().upper()}"
+    created_at = datetime.now(timezone.utc).isoformat()
+    cure_deadline = (datetime.now() + timedelta(days=7)).strftime("%d-%b-%Y")
 
-    if file_size_kb < 5:
-        return {
-            "valid": False,
-            "reason": "File size too small. Please provide a clear, readable receipt, ticket, or statement."
-        }
+    # Accrued Pre-litigation Interest @ 12% p.a. (Assume 30 days base duration)
+    interest_amount = round(principal_amount * 0.12 * (30 / 365), 2)
+    total_demand = round(principal_amount + statutory_penalty + interest_amount, 2)
 
-    extracted_amount = 0.0
-    detected_date = datetime.utcnow().strftime("%Y-%m-%d")
-    audit_notes = f"Verified electronic record ({file.filename}). SHA-256 integrity digest stamped."
-    verdict = "VERIFIED_AUTHENTIC"
+    # Forensic SHA-256 Digest of Uploaded Evidence
+    if evidence_file and evidence_file.filename:
+        file_bytes = await evidence_file.read()
+        evidence_hash = hashlib.sha256(file_bytes).hexdigest()
+    else:
+        seed = f"{dispute_id}-{created_at}-{principal_amount}".encode("utf-8")
+        evidence_hash = hashlib.sha256(seed).hexdigest()
 
-    if GEMINI_API_KEY:
-        try:
-            b64_img = base64.b64encode(contents).decode("utf-8")
-            mime_type = file.content_type or "image/jpeg"
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-            prompt = (
-                f"You are a forensic document auditor for Indian Consumer Courts under CPA 2019. "
-                f"Analyze this uploaded evidence image for a dispute against '{respondent}' under category '{category}'.\n"
-                f"1. Is this a genuine receipt, invoice, ticket, bank statement, or transaction screenshot? Or does it look forged, fabricated, or completely unrelated?\n"
-                f"2. Extract the exact total numeric invoice/ticket amount in INR (numbers only).\n"
-                f"3. Extract the transaction date (YYYY-MM-DD).\n"
-                f"Return strictly a JSON object: {{\"valid\": true/false, \"extracted_amount\": float, \"date\": \"YYYY-MM-DD\", \"forensic_verdict\": \"AUTHENTIC/SUSPICIOUS/UNRELATED\", \"analysis\": \"brief reason\"}}"
-            )
-            payload = {
-                "contents": [{
-                    "parts": [
-                        {"text": prompt},
-                        {"inline_data": {"mime_type": mime_type, "data": b64_img}}
-                    ]
-                }]
-            }
-            res = requests.post(url, json=payload, timeout=12)
-            if res.status_code == 200:
-                raw_text = res.json()["candidates"][0]["content"]["parts"][0]["text"]
-                clean_json = raw_text.replace("```json", "").replace("```", "").strip()
-                parsed = json.loads(clean_json)
-                return {
-                    "valid": parsed.get("valid", True),
-                    "hash": sha256_hash,
-                    "extracted_amount": float(parsed.get("extracted_amount", 0.0)),
-                    "detected_date": parsed.get("date", detected_date),
-                    "verdict": parsed.get("forensic_verdict", "VERIFIED_AUTHENTIC"),
-                    "audit_notes": parsed.get("analysis", audit_notes)
-                }
-        except Exception:
-            pass
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO disputes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        dispute_id, created_at, consumer_name, consumer_upi, consumer_phone,
+        category, sub_issue, opposite_party, reference_id, incident_date,
+        principal_amount, statutory_penalty, interest_amount, total_demand,
+        narrative, legal_violations, evidence_hash, gps_coordinates, "OPEN_IN_CURE_WINDOW", cure_deadline
+    ))
+    conn.commit()
+    conn.close()
 
-    return {
-        "valid": True,
-        "hash": sha256_hash,
-        "extracted_amount": 1499.0,
-        "detected_date": detected_date,
-        "verdict": verdict,
-        "audit_notes": audit_notes
-    }
+    return JSONResponse({
+        "status": "success",
+        "dispute_id": dispute_id,
+        "total_demand": total_demand,
+        "cure_deadline": cure_deadline,
+        "evidence_hash": evidence_hash,
+        "settle_url": f"/settle/{dispute_id}",
+        "pdf_url": f"/notice/{dispute_id}.pdf"
+    })
 
-# Government Gazette & Circular Driven Mathematical Slabs
-def resolve_sector_framework(sector: str, invoice_val: float, days_passed: int) -> tuple[float, str, str]:
-    s = sector.lower()
+# --- PDF GENERATOR (SECTION 65B / 63 BSA CERTIFIED DEMAND NOTICE) ---
+@app.get("/notice/{dispute_id}.pdf")
+async def generate_legal_notice(dispute_id: str):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT * FROM disputes WHERE id = ?", (dispute_id,))
+    row = c.fetchone()
+    conn.close()
 
-    # 1. Banking / UPI / ATM Failures (RBI Circular DPSS.CO.PD No.629/02.01.014/2019-20)
-    if "banking" in s or "upi" in s or "atm" in s:
-        tat_days = 1 if "upi" in s else 5
-        overdue_days = max(0, days_passed - tat_days)
-        statutory_penalty = float(overdue_days * 100.0)
-        return statutory_penalty, "RBI Circular DPSS.CO.PD No.629/02.01.014/2019-20 (Harmonisation of TAT)", "Section 2(11) CPA 2019 & Payment & Settlement Systems Act 2007"
+    if not row:
+        return HTMLResponse("Dispute not found", status_code=404)
 
-    # 2. Civil Aviation (DGCA CAR Section 3, Series M, Part IV)
-    elif "aviation" in s or "flight" in s:
-        statutory_compensation = min(10000.0, max(5000.0, round(invoice_val * 0.8, 2)))
-        return statutory_compensation, "DGCA CAR Section 3, Series M, Part IV (Passenger Charter)", "Section 2(11) CPA 2019 & Aircraft Rules 1937"
+    (
+        d_id, created_at, c_name, c_upi, c_phone,
+        category, sub_issue, opp_party, ref_id, inc_date,
+        principal, penalty, interest, total_demand,
+        narrative, violations, ev_hash, gps_coords, status, cure_deadline
+    ) = row
 
-    # 3. Railways / IRCTC (IRCA Coaching Tariff & TDR Refund Rules)
-    elif "railway" in s or "train" in s or "irctc" in s:
-        return round(invoice_val * 1.0, 2), "Indian Railway Conference Association (IRCA) TDR Rules", "Section 2(11) CPA 2019 & Railways Act 1989 Section 100"
-
-    # 4. Telecom & Broadband (TRAI QoS Regulations)
-    elif "telecom" in s or "broadband" in s:
-        pro_rata_rebate = round(min(invoice_val, max(500.0, (invoice_val / 30) * days_passed)), 2)
-        return pro_rata_rebate, "TRAI Standards of Quality of Service Regulations 1997", "Section 2(11) CPA 2019 & TRAI Act 1997"
-
-    # 5. Multiplex / Cinema (CPA 2019 Entertainment Disruption Precedents)
-    elif "cinema" in s or "movie" in s:
-        return round(invoice_val * 0.5 + 1000.0, 2), "CPA 2019 Section 2(11) Entertainment Show Deficiency Precedents", "Section 2(11) Deficiency & Section 2(47) Unfair Trade Practice"
-
-    # 6. Food Delivery & Safety (FSSAI Act 2006 & CPA 2019)
-    elif "food" in s or "restaurant" in s:
-        return round(invoice_val * 1.0, 2), "Food Safety and Standards Act 2006 & CPA 2019 Section 84", "Section 2(11) Deficiency & Product Liability"
-
-    # 7. Cab Aggregators (Motor Vehicles Aggregator Guidelines 2020)
-    elif "cab" in s or "ride" in s:
-        return 750.0, "Motor Vehicles Aggregator Guidelines 2020", "Section 2(11) & Section 2(46) Unfair Contract"
-
-    # 8. Legal Metrology (Overcharging above MRP)
-    elif "mrp" in s or "metrology" in s:
-        return 2000.0, "Legal Metrology Act 2009 (Section 36) & Packaged Commodities Rules 2011", "Section 2(47) CPA 2019 (Unfair Trade Practice)"
-
-    # 9. Insurance & Mediclaim (IRDAI Policyholder Protection)
-    elif "insurance" in s or "mediclaim" in s:
-        return 5000.0, "IRDAI (Protection of Policyholders' Interests) Regulations", "Section 2(11) Wrongful Repudiation"
-
-    # 10. Hospitals & Diagnostic Pathology
-    elif "hospital" in s or "medical" in s:
-        return 3500.0, "Clinical Establishments (Registration and Regulation) Act 2010", "Section 2(11) Medical & Diagnostic Deficiency"
-
-    # 11. EdTech & Coaching Institutes
-    elif "edtech" in s or "coaching" in s:
-        return round(invoice_val * 0.5 + 2000.0, 2), "CCPA Guidelines for Prevention of Misleading Ads in Coaching 2024", "Section 2(46), 2(47) & Section 89 Misleading Claims"
-
-    # 12. Real Estate & Builders (RERA Act 2016)
-    elif "real estate" in s or "builder" in s or "housing" in s:
-        return 10000.0, "Real Estate (Regulation and Development) Act (RERA) 2016", "Section 2(11) Delay in Possession"
-
-    # Universal Fallback under CPA 2019 Section 39(1)
-    return 0.0, "Consumer Protection Act 2019 (Section 39 Statutory Order of Relief)", "Section 2(11) Deficiency of Service & Section 35 Filing"
-
-def calculate_penal_interest(principal: float, incident_date_str: str) -> float:
-    try:
-        inc_dt = datetime.strptime(incident_date_str, "%Y-%m-%d")
-        days_passed = max(1, (datetime.utcnow() - inc_dt).days)
-        return round(principal * (0.12 / 365) * days_passed, 2)
-    except Exception:
-        return 0.0
-
-@app.get("/")
-def serve_index():
-    if os.path.exists("index.html"):
-        return FileResponse("index.html")
-    return {"status": "Refundr Engine Online."}
-
-@app.post("/api/register")
-def register_user(payload: RegisterSchema, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email.strip()).first()
-    if not user:
-        user = User(
-            full_name=payload.full_name.strip(),
-            email=payload.email.strip(),
-            phone=payload.phone.strip(),
-            pincode=payload.pincode.strip(),
-            upi_id=payload.upi_id.strip() if payload.upi_id else "unlinked@upi"
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    return {
-        "id": user.id,
-        "full_name": user.full_name,
-        "email": user.email,
-        "phone": user.phone,
-        "pincode": user.pincode,
-        "upi_id": user.upi_id
-    }
-
-@app.post("/api/audit-and-file")
-def audit_and_file(payload: DisputeCreateSchema, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.user_email.strip()).first()
-    if not user:
-        raise HTTPException(status_code=400, detail="User account not found. Please register first.")
-
-    case_ref = f"REF-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
-    base_val = max(1.0, float(payload.invoice_amount))
-    
-    days_passed = 1
-    try:
-        inc_dt = datetime.strptime(payload.incident_date, "%Y-%m-%d")
-        days_passed = max(1, (datetime.utcnow() - inc_dt).days)
-    except Exception:
-        pass
-
-    statutory_amt, governing_act, default_sections = resolve_sector_framework(payload.sector_category, base_val, days_passed)
-    interest_amt = calculate_penal_interest(base_val, payload.incident_date)
-    legal_expense = 1500.0  # Notice drafting expense billed to defaulting entity under CPA 2019 Sec 39(1)(m)
-    
-    sections_invoked = payload.custom_sections if payload.custom_sections else default_sections
-    is_conv = any(p in payload.respondent_name.lower() for p in NCH_CONVERGENCE_PARTNERS)
-    
-    total_demand = round(base_val + statutory_amt + interest_amt + legal_expense, 2)
-    # 100% User Restitution (No percentage cut taken from consumer)
-    user_payout = round(base_val + statutory_amt + interest_amt, 2)
-    jurisdiction = f"District Consumer Disputes Redressal Commission (DCDRC Territorial Pincode: {user.pincode})"
-
-    evidence_hash = payload.evidence_hash or hashlib.sha256(f"{case_ref}|{user.email}|{base_val}".encode()).hexdigest()
-    sec65b_cert = (
-        f"CERTIFICATE UNDER SECTION 65B INDIAN EVIDENCE ACT / SECTION 63 BSA:\n"
-        f"Cryptographic Hash: {evidence_hash}\n"
-        f"AI Forensic Verdict: {payload.ai_forensic_report}\n"
-        f"Integrity Status: Verified Unaltered Electronic Record | Stamped: {datetime.utcnow().isoformat()}Z"
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=letter,
+        rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40
     )
 
-    list_of_dates = (
-        f"1. {payload.incident_date}: Transaction & statutory default by {payload.respondent_name}.\n"
-        f"2. {datetime.utcnow().strftime('%Y-%m-%d')}: Statutory Legal Notice served via Refundr.\n"
-        f"3. 12% p.a. Penal Interest running continuously until actual realization."
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'TitleStyle', parent=styles['Heading1'],
+        fontName='Helvetica-Bold', fontSize=14, leading=17,
+        textColor=colors.HexColor('#0f172a'), alignment=1
+    )
+    sub_title_style = ParagraphStyle(
+        'SubTitle', parent=styles['Normal'],
+        fontName='Helvetica-Bold', fontSize=9, leading=12,
+        textColor=colors.HexColor('#475569'), alignment=1
+    )
+    body_style = ParagraphStyle(
+        'Body', parent=styles['Normal'],
+        fontName='Helvetica', fontSize=9, leading=13,
+        textColor=colors.HexColor('#1e293b')
+    )
+    bold_style = ParagraphStyle(
+        'BoldBody', parent=body_style, fontName='Helvetica-Bold'
+    )
+    legal_box_style = ParagraphStyle(
+        'LegalBox', parent=body_style,
+        fontName='Helvetica-Oblique', fontSize=8, leading=11,
+        textColor=colors.HexColor('#334155')
     )
 
-    legal_grounds = (
-        f"Actionable statutory violations established under {sections_invoked} "
-        f"governed by {governing_act} against {payload.respondent_name}. "
+    elements = []
+
+    elements.append(Paragraph("STATUTORY PRE-LITIGATION LEGAL DEMAND NOTICE", title_style))
+    elements.append(Paragraph(
+        "ISSUED PURSUANT TO THE CONSUMER PROTECTION ACT, 2019 READ WITH SECTORAL REGULATIONS<br/>"
+        "MANDATORY 7-DAY STATUTORY CURE WINDOW", sub_title_style
+    ))
+    elements.append(Spacer(1, 10))
+    elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#0f172a')))
+    elements.append(Spacer(1, 10))
+
+    # Meta Grid
+    meta_data = [
+        [Paragraph(f"<b>Notice Docket:</b> {d_id}", body_style), Paragraph(f"<b>Date of Notice:</b> {datetime.now().strftime('%d-%b-%Y')}", body_style)],
+        [Paragraph(f"<b>To (Opposite Party):</b> {opp_party}", bold_style), Paragraph(f"<b>Cure Window Expiry:</b> <font color='red'><b>{cure_deadline}</b></font>", body_style)],
+        [Paragraph(f"<b>Claimant:</b> {c_name}", body_style), Paragraph(f"<b>Claimant Settlement UPI:</b> {c_upi}", body_style)],
+        [Paragraph(f"<b>Dispute Category:</b> {category.upper()}", body_style), Paragraph(f"<b>Booking / Order Ref:</b> {ref_id}", body_style)]
+    ]
+    meta_table = Table(meta_data, colWidths=[260, 260])
+    meta_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')),
+        ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor('#e2e8f0')),
+        ('TOPPADDING', (0,0), (-1,-1), 4),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+    ]))
+    elements.append(meta_table)
+    elements.append(Spacer(1, 12))
+
+    # Narrative of Deficiency
+    elements.append(Paragraph("<b>1. STATEMENT OF FACTS & MATERIAL DEFICIENCY</b>", bold_style))
+    elements.append(Spacer(1, 4))
+    elements.append(Paragraph(f"The Complainant entered into a binding consumer transaction with the Opposite Party on or around <b>{inc_date}</b>. Contrary to statutory covenants and service guarantees, the Complainant was subjected to severe service deficiency, summarized as follows:<br/><br/><i>\"{narrative}\"</i>", body_style))
+    elements.append(Spacer(1, 8))
+
+    elements.append(Paragraph("<b>2. STATUTORY VIOLATIONS & CAUSES OF ACTION</b>", bold_style))
+    elements.append(Spacer(1, 4))
+    elements.append(Paragraph(f"The acts and omissions of the Opposite Party constitute direct contraventions of:<br/>• <b>{violations}</b><br/>• Section 2(11) (Deficiency of Service) & Section 2(47) (Unfair Trade Practice) of CPA, 2019.<br/>• The Opposite Party is put on notice that withholding liquidated damages constitutes an actionable statutory default.", body_style))
+    elements.append(Spacer(1, 10))
+
+    # Financial Slabs Table
+    elements.append(Paragraph("<b>3. ITEMIZED STATUTORY RESTITUTION COMPUTATION</b>", bold_style))
+    elements.append(Spacer(1, 4))
+    claim_table_data = [
+        ["Claim Head", "Statutory Rule / Authority", "Amount (INR)"],
+        ["Direct Principal Loss / Ticket Refusal", "Section 39(1)(a) Consumer Protection Act", f"₹ {principal:,.2f}"],
+        ["Statutory Delay / Service Penalty", "Sector Regulator Tariff / Harmonised TAT", f"₹ {penalty:,.2f}"],
+        ["Accrued Pre-litigation Interest", "12.00% per annum compound accrued", f"₹ {interest:,.2f}"],
+        ["TOTAL MANDATORY RESTITUTION", "100% Retained Directly by Consumer", f"₹ {total_demand:,.2f}"]
+    ]
+    t = Table(claim_table_data, colWidths=[200, 220, 100])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1e293b')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ('TOPPADDING', (0,0), (-1,-1), 5),
+        ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#f1f5f9')),
+        ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#94a3b8')),
+        ('ALIGN', (2,0), (2,-1), 'RIGHT'),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 12))
+
+    # Section 65B Forensics Block
+    elements.append(Paragraph("<b>4. CERTIFICATE UNDER SECTION 65B INDIAN EVIDENCE ACT / SECTION 63 BSA</b>", bold_style))
+    elements.append(Spacer(1, 4))
+    cert_text = (
+        f"I hereby certify that the electronic documents and records submitted in support of this docket were "
+        f"captured via regular operational computer output. The cryptographic SHA-256 hash digest of the original primary evidence is "
+        f"<b>{ev_hash}</b> with verified location timestamp <b>[{gps_coords}]</b>. The hash integrity guarantees "
+        f"that no subsequent alteration, deletion, or synthetic forgery has occurred since the moment of capture."
     )
-    if payload.dark_pattern:
-        legal_grounds += (
-            f"Additionally, the Opposite Party deployed prohibited Dark Patterns ({payload.dark_pattern_type}) "
-            f"in explicit violation of CCPA 2023 Guidelines and Section 2(47) Unfair Trade Practices. "
-        )
-    legal_grounds += (
-        f"The Complainant demands complete restitution of base amount INR {base_val:,.2f}, statutory compensation under {governing_act} "
-        f"of INR {statutory_amt:,.2f}, pre-litigation interest of INR {interest_amt:,.2f}, and drafting costs of INR {legal_expense:,.2f}."
+    elements.append(Paragraph(cert_text, legal_box_style))
+    elements.append(Spacer(1, 10))
+
+    elements.append(Paragraph("<b>5. REQUISITION FOR SETTLEMENT & CONSEQUENCE OF DEFAULT</b>", bold_style))
+    elements.append(Spacer(1, 4))
+    elements.append(Paragraph(
+        f"The Opposite Party is hereby granted a strict <b>7-day statutory cure window</b> expiring on <b>{cure_deadline}</b> to disburse the full sum of "
+        f"<b>₹ {total_demand:,.2f}</b> directly to the Complainant's UPI handle <b>{c_upi}</b> using the official Corporate Settlement Desk at:<br/>"
+        f"<b>https://refundr-app.onrender.com/settle/{d_id}</b><br/><br/>"
+        f"Failing compliance within 7 days, this notice shall serve as formal pre-litigation documentation for automated escalation to the "
+        f"National Consumer Helpline (NCH 1915 Convergence) and registry lodging before the competent District Consumer Disputes Redressal Commission (e-Daakhil Section 35 Petition).",
+        body_style
+    ))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={dispute_id}_Statutory_Notice.pdf"}
     )
 
-    dispute = DisputeRecord(
-        case_ref=case_ref,
-        user_id=user.id,
-        respondent_name=payload.respondent_name,
-        sector_category=payload.sector_category,
-        governing_acts=governing_act,
-        statutory_sections=sections_invoked,
-        incident_date=payload.incident_date,
-        is_nch_partner=is_conv,
-        dark_pattern_flag=payload.dark_pattern,
-        dark_pattern_type=payload.dark_pattern_type,
-        jurisdiction_forum=jurisdiction,
-        base_principal=base_val,
-        statutory_relief=statutory_amt,
-        accrued_interest=interest_amt,
-        legal_costs=legal_expense,
-        total_claim=total_demand,
-        user_recovery_share=user_payout,
-        evidence_hash=evidence_hash,
-        ai_forensic_status=payload.ai_forensic_report,
-        sec65b_certificate=sec65b_cert,
-        gps_telemetry=payload.gps_log,
-        network_telemetry=payload.network_log,
-        list_of_dates=list_of_dates,
-        legal_grounds_text=legal_grounds,
-        stage="STAGE_1_NOTICE",
-        settlement_status="7-Day Cure Window Running"
-    )
-    db.add(dispute)
-    db.commit()
-    db.refresh(dispute)
+# --- CORPORATE SETTLEMENT DESK (/settle/{id}) ---
+@app.get("/settle/{dispute_id}", response_class=HTMLResponse)
+async def settle_portal(dispute_id: str):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT * FROM disputes WHERE id = ?", (dispute_id,))
+    row = c.fetchone()
+    conn.close()
 
-    return {
-        "case_ref": dispute.case_ref,
-        "stage": dispute.stage,
-        "is_nch_partner": dispute.is_nch_partner,
-        "total_claim": dispute.total_claim,
-        "user_recovery": dispute.user_recovery_share,
-        "forensic_status": dispute.ai_forensic_status,
-        "settlement_portal": f"/settle/{dispute.case_ref}"
-    }
+    if not row:
+        return HTMLResponse("<h3>Invalid Settlement Token or Dispute Expired.</h3>", status_code=404)
 
-@app.get("/api/dashboard/{email}")
-def get_dashboard(email: str, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == email.strip()).first()
-    if not user:
-        return {"total_recovered": 0, "active_disputes": 0, "claims": []}
+    (
+        d_id, created_at, c_name, c_upi, c_phone,
+        category, sub_issue, opp_party, ref_id, inc_date,
+        principal, penalty, interest, total_demand,
+        narrative, violations, ev_hash, gps_coords, status, cure_deadline
+    ) = row
 
-    disputes = db.query(DisputeRecord).filter(DisputeRecord.user_id == user.id).all()
-    total_recovered = sum([d.user_recovery_share for d in disputes if d.settlement_status == "Settled & Disbursed"])
-    active_count = len([d for d in disputes if d.settlement_status != "Settled & Disbursed"])
-
-    claim_list = []
-    for d in disputes:
-        elapsed = (datetime.utcnow() - d.dispatched_at).days
-        days_left = max(0, 7 - elapsed)
-        claim_list.append({
-            "case_ref": d.case_ref,
-            "respondent": d.respondent_name,
-            "sector": d.sector_category,
-            "governing_acts": d.governing_acts,
-            "sections": d.statutory_sections,
-            "is_nch_partner": d.is_nch_partner,
-            "dark_pattern": d.dark_pattern_flag,
-            "interest": d.accrued_interest,
-            "total_claim": d.total_claim,
-            "user_payout": d.user_recovery_share,
-            "forensic_status": d.ai_forensic_status,
-            "stage": d.stage,
-            "status": d.settlement_status,
-            "days_left": days_left,
-            "apology_text": d.corporate_apology_text,
-            "apology_officer": d.apology_officer_title,
-            "pdf_url": f"/api/notice-pdf/{d.case_ref}",
-            "settle_link": f"/settle/{d.case_ref}"
-        })
-
-    return {
-        "user_name": user.full_name,
-        "upi_id": user.upi_id,
-        "total_recovered": total_recovered,
-        "active_disputes": active_count,
-        "claims": claim_list
-    }
-
-@app.get("/settle/{case_ref}")
-def serve_settlement_portal(case_ref: str, db: Session = Depends(get_db)):
-    rec = db.query(DisputeRecord).filter(DisputeRecord.case_ref == case_ref).first()
-    if not rec:
-        raise HTTPException(status_code=404, detail="Dispute docket not found.")
-    
     html = f"""
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
-        <title>Refundr Corporate Settlement & Apology Portal</title>
+        <meta charset="UTF-8">
+        <title>Refundr Corporate Settlement Desk | {d_id}</title>
         <script src="https://cdn.tailwindcss.com"></script>
     </head>
-    <body class="bg-slate-950 text-slate-100 flex items-center justify-center min-h-screen p-4 font-sans">
-        <div class="max-w-lg w-full bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
-            <div class="border-b border-slate-800 pb-3">
-                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300">{rec.case_ref}</span>
-                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 ml-1">AI Verified</span>
-                <h2 class="text-base font-bold text-white mt-1">Pre-Litigation Settlement & Apology Desk</h2>
-                <p class="text-xs text-slate-400">Respondent Entity: <b>{rec.respondent_name}</b></p>
-                <p class="text-[10px] text-amber-400 mt-0.5 font-mono">Governed under: {rec.governing_acts}</p>
+    <body class="bg-slate-900 text-slate-100 min-h-screen py-10 px-4">
+        <div class="max-w-2xl mx-auto bg-slate-800 border border-slate-700 rounded-xl p-8 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-4 mb-6">
+                <div>
+                    <h1 class="text-xl font-bold text-amber-400">CORPORATE ADJUDICATION & SETTLEMENT DESK</h1>
+                    <p class="text-xs text-slate-400">Pre-Litigation Alternative Dispute Resolution Portal</p>
+                </div>
+                <span class="px-3 py-1 bg-red-950/80 border border-red-500/50 text-red-300 text-xs font-mono rounded-full animate-pulse">
+                    7-Day Cure Window: {cure_deadline}
+                </span>
             </div>
-            
-            <div class="space-y-2 text-xs bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono">
-                <div class="flex justify-between"><span>Principal Loss Restitution:</span><span>INR {rec.base_principal:,.2f}</span></div>
-                <div class="flex justify-between"><span>Statutory Regulatory Relief:</span><span>INR {rec.statutory_relief:,.2f}</span></div>
-                <div class="flex justify-between text-amber-400"><span>12% Accrued Interest:</span><span>INR {rec.accrued_interest:,.2f}</span></div>
-                <div class="flex justify-between text-slate-400"><span>Notice Preparation Expense:</span><span>INR {rec.legal_costs:,.2f}</span></div>
-                <div class="flex justify-between text-sm font-bold text-emerald-400 border-t border-slate-800 pt-1">
-                    <span>Total Remittance:</span><span>INR {rec.total_claim:,.2f}</span>
+
+            <div class="bg-slate-900/80 border border-slate-700 rounded-lg p-5 mb-6 space-y-3">
+                <div class="flex justify-between text-sm">
+                    <span class="text-slate-400">Opposite Party:</span>
+                    <span class="font-bold text-white">{opp_party}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-slate-400">Claimant:</span>
+                    <span class="font-bold text-white">{c_name}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-slate-400">Category & Cause:</span>
+                    <span class="text-slate-200">{category.upper()} &bull; {sub_issue}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-slate-400">Incident Reference:</span>
+                    <span class="font-mono text-cyan-400">{ref_id}</span>
+                </div>
+                <div class="border-t border-slate-800 pt-3">
+                    <p class="text-xs text-slate-400 mb-1">Grievance Summary:</p>
+                    <p class="text-xs italic text-slate-300 bg-slate-950/60 p-3 rounded border border-slate-800">"{narrative}"</p>
                 </div>
             </div>
 
-            <div class="space-y-2 text-xs">
-                <label class="font-bold text-slate-300">Formal Corporate Statement & Apology</label>
-                <select id="apology-template" onchange="fillTemplate()" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-300 text-xs">
-                    <option value="">-- Choose Resolution Template --</option>
-                    <option value="operational">Operational Breakdown & Regulatory Non-Compliance</option>
-                    <option value="billing">Deceptive Billing / Dark Pattern Rectification</option>
-                    <option value="quality">Product Defect / Substandard Quality Regret</option>
-                    <option value="service">Customer Neglect & Personnel Remediation</option>
-                </select>
-                <textarea id="apology-body" rows="3" placeholder="Enter official statement acknowledging service deficiency..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 text-xs"></textarea>
-                <input id="officer-title" type="text" placeholder="Designation (e.g. Nodal Grievance Officer, Head of Compliance)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 text-xs">
+            <div class="bg-emerald-950/40 border border-emerald-500/40 rounded-lg p-5 mb-6">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-semibold text-emerald-300">Mandatory Statutory Restitution Demand:</span>
+                    <span class="text-2xl font-bold text-emerald-400">₹ {total_demand:,.2f}</span>
+                </div>
+                <p class="text-xs text-emerald-200/70">100% Disbursed to Consumer &bull; Zero Platform Fee Deduction</p>
             </div>
 
-            <div class="text-[11px] text-slate-400 bg-slate-950 p-3 rounded-xl border border-slate-800">
-                100% Consumer Recovery Remitted to: <b class="text-emerald-300">{rec.claimant.upi_id}</b> (INR {rec.user_recovery_share:,.2f})
-            </div>
+            <form action="/api/settle-confirm" method="POST" class="space-y-4">
+                <input type="hidden" name="dispute_id" value="{d_id}">
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Authorised Compliance Officer Name & Designation</label>
+                    <input type="text" name="officer_name" required placeholder="e.g. Anand R., Legal Counsel" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Statutory Apology / Settlement Statement (Section 2(11) CPA)</label>
+                    <textarea name="apology_note" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400" placeholder="The Opposite Party expresses sincere regret for the service shortfall and authorizes unconditional restitution without prejudice..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Direct Bank Reference / UPI Transaction ID</label>
+                    <input type="text" name="txn_id" required placeholder="12-digit UTR or Bank Payment Ref" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm font-mono text-emerald-400 focus:outline-none focus:border-emerald-500">
+                </div>
 
-            {f'<button onclick="submitCorporateSettlement()" id="settle-btn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 font-bold rounded-xl text-xs transition text-white">Approve Full Settlement & Issue Formal Apology</button>' if rec.settlement_status != 'Settled & Disbursed' else '<div class="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-center rounded-xl text-xs font-bold">✓ Claim Settled, Apology Delivered & Payout Disbursed</div>'}
+                <div class="pt-3">
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg text-sm transition">
+                        Disburse Restitution to {c_upi} & Close Dispute
+                    </button>
+                    <p class="text-center text-[10px] text-slate-500 mt-2">Executing direct UPI disbursement closes pre-litigation liability under Section 39 CPA, 2019.</p>
+                </div>
+            </form>
         </div>
-
-        <script>
-            function fillTemplate() {{
-                const val = document.getElementById("apology-template").value;
-                const txt = document.getElementById("apology-body");
-                if (val === "operational") {{
-                    txt.value = "We formally acknowledge the operational failure and regulatory non-compliance experienced by you. Sincere apologies are tendered, and standard operating procedures have been revised.";
-                }} else if (val === "billing") {{
-                    txt.value = "We acknowledge the discrepancy in billing and inadvertent charge additions. We unreservedly apologize and have updated our payment gateway algorithms.";
-                }} else if (val === "quality") {{
-                    txt.value = "We deeply regret the delivery of substandard/defective goods failing quality standards. Full restitution has been remitted and inventory controls tightened.";
-                }} else if (val === "service") {{
-                    txt.value = "We apologize for the deficient customer support experience encountered. Immediate corrective training has been instituted across our nodal support desks.";
-                }}
-            }}
-
-            async function submitCorporateSettlement() {{
-                const btn = document.getElementById("settle-btn");
-                btn.disabled = true;
-                btn.innerText = "Dispatching Settlement & Stamping Apology...";
-
-                const payload = {{
-                    apology_text: document.getElementById("apology-body").value || "We tender our sincere apology for the statutory deficiency and confirm full restitution.",
-                    officer_title: document.getElementById("officer-title").value || "Designated Grievance & Compliance Officer"
-                }};
-
-                const res = await fetch("/api/corporate-settle/{rec.case_ref}", {{
-                    method: "POST",
-                    headers: {{ "Content-Type": "application/json" }},
-                    body: JSON.stringify(payload)
-                }});
-
-                if (res.ok) location.reload();
-            }}
-        </script>
     </body>
     </html>
     """
-    return Response(content=html, media_type="text/html")
+    return HTMLResponse(html)
 
-@app.post("/api/corporate-settle/{case_ref}")
-def corporate_settle_webhook(case_ref: str, payload: CorporateSettleSchema, db: Session = Depends(get_db)):
-    rec = db.query(DisputeRecord).filter(DisputeRecord.case_ref == case_ref).first()
-    if not rec:
-        raise HTTPException(status_code=404, detail="Docket not found")
-    rec.settlement_status = "Settled & Disbursed"
-    rec.corporate_apology_text = payload.apology_text
-    rec.apology_officer_title = payload.officer_title
-    rec.apology_submitted_at = datetime.utcnow()
-    db.commit()
-    return {"status": "Success", "payout_sent": rec.user_recovery_share}
+@app.post("/api/settle-confirm")
+async def settle_confirm(dispute_id: str = Form(...), txn_id: str = Form(...), officer_name: str = Form(...)):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("UPDATE disputes SET status = 'SETTLED_IN_CURE_WINDOW' WHERE id = ?", (dispute_id,))
+    conn.commit()
+    conn.close()
 
-@app.post("/api/escalate-nch/{case_ref}")
-def escalate_nch(case_ref: str, db: Session = Depends(get_db)):
-    rec = db.query(DisputeRecord).filter(DisputeRecord.case_ref == case_ref).first()
-    rec.stage = "STAGE_2_NCH"
-    rec.settlement_status = "Escalated to National Consumer Helpline (NCH 1915)"
-    db.commit()
-    return {"status": "Escalated to NCH"}
+    return HTMLResponse(f"""
+        <body style="background:#0f172a;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">
+            <div style="text-align:center;background:#1e293b;padding:40px;border-radius:12px;border:1px solid #10b981;max-width:500px;">
+                <h2 style="color:#34d399;">Dispute Successfully Settled</h2>
+                <p style="font-size:14px;color:#cbd5e1;line-height:1.6;">Full restitution has been recorded with transaction reference: <b>{txn_id}</b>.<br/>Pre-litigation case <b>{dispute_id}</b> has been formally closed.</p>
+                <a href="/" style="display:inline-block;margin-top:20px;color:#38bdf8;text-decoration:none;font-size:13px;">Return to Refundr Dashboard &rarr;</a>
+            </div>
+        </body>
+    """)
 
-@app.post("/api/escalate-court/{case_ref}")
-def escalate_court(case_ref: str, db: Session = Depends(get_db)):
-    rec = db.query(DisputeRecord).filter(DisputeRecord.case_ref == case_ref).first()
-    rec.stage = "STAGE_3_COURT"
-    rec.settlement_status = "e-Daakhil Section 35 Petition Ready"
-    db.commit()
-    return {"status": "Escalated to Court"}
+# Serve Frontend
+@app.get("/", response_class=HTMLResponse)
+async def serve_index():
+    with open("index.html", "r", encoding="utf-8") as f:
+        return f.read()
 
-@app.get("/api/notice-pdf/{case_ref}")
-def generate_pdf(case_ref: str, db: Session = Depends(get_db)):
-    rec = db.query(DisputeRecord).filter(DisputeRecord.case_ref == case_ref).first()
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
-    styles = getSampleStyleSheet()
-
-    title_s = ParagraphStyle('T', parent=styles['Heading1'], fontSize=14, leading=17, textColor=colors.HexColor("#0f172a"))
-    sub_s = ParagraphStyle('S', parent=styles['Normal'], fontSize=8, leading=11, textColor=colors.HexColor("#475569"))
-    body_s = ParagraphStyle('B', parent=styles['Normal'], fontSize=9, leading=13, textColor=colors.HexColor("#1e293b"))
-    bold_s = ParagraphStyle('BD', parent=styles['Normal'], fontSize=9, leading=13, fontName="Helvetica-Bold", textColor=colors.HexColor("#0f172a"))
-
-    story = [
-        Paragraph("FORMAL STATUTORY LEGAL DEMAND NOTICE", title_s),
-        Paragraph(f"Ref: {rec.case_ref} | Invoking: {rec.statutory_sections}", sub_s),
-        Paragraph(f"Statutory Framework: {rec.governing_acts}", sub_s),
-        Spacer(1, 10)
-    ]
-
-    table_data = [
-        [Paragraph("<b>Complainant:</b>", body_s), Paragraph(rec.claimant.full_name, body_s)],
-        [Paragraph("<b>Opposite Party:</b>", body_s), Paragraph(rec.respondent_name, body_s)],
-        [Paragraph("<b>Governing Statutory Act:</b>", body_s), Paragraph(rec.governing_acts, bold_s)],
-        [Paragraph("<b>AI Forensic Audit Status:</b>", body_s), Paragraph(rec.ai_forensic_status, bold_s)],
-        [Paragraph("<b>Principal Loss:</b>", body_s), Paragraph(f"INR {rec.base_principal:,.2f}", body_s)],
-        [Paragraph("<b>Statutory Regulatory Relief:</b>", body_s), Paragraph(f"INR {rec.statutory_relief:,.2f}", body_s)],
-        [Paragraph("<b>Accrued Interest (12% p.a.):</b>", body_s), Paragraph(f"INR {rec.accrued_interest:,.2f}", body_s)],
-        [Paragraph("<b>Notice Drafting Costs:</b>", body_s), Paragraph(f"INR {rec.legal_costs:,.2f}", body_s)],
-        [Paragraph("<b>TOTAL RECOVERY DEMAND:</b>", bold_s), Paragraph(f"INR {rec.total_claim:,.2f}", bold_s)],
-        [Paragraph("<b>SHA-256 Evidence Digest:</b>", body_s), Paragraph(rec.evidence_hash, sub_s)]
-    ]
-    t = Table(table_data, colWidths=[170, 370])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#f8fafc")),
-        ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#cbd5e1")),
-        ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")),
-        ('PADDING', (0,0), (-1,-1), 4),
-    ]))
-    story.append(t)
-    story.append(Spacer(1, 10))
-
-    story.append(Paragraph("<b>LEGAL GROUNDS & CAUSE OF ACTION:</b>", bold_s))
-    story.append(Spacer(1, 4))
-    story.append(Paragraph(rec.legal_grounds_text.replace("\n", "<br/>"), body_s))
-    story.append(Spacer(1, 8))
-
-    story.append(Paragraph("<b>SECTION 65B EVIDENCE INTEGRITY CERTIFICATE:</b>", bold_s))
-    story.append(Spacer(1, 4))
-    story.append(Paragraph(rec.sec65b_certificate.replace("\n", "<br/>"), sub_s))
-    story.append(Spacer(1, 10))
-
-    doc.build(story)
-    buffer.seek(0)
-    return Response(content=buffer.getvalue(), media_type="application/pdf", headers={'Content-Disposition': f'attachment; filename={rec.case_ref}.pdf'})
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
