@@ -14,6 +14,12 @@
     .category-card.selected { border-color: #0284c7; background: rgba(2, 132, 199, 0.18); }
     .subissue-pill { transition: all 0.15s ease; }
     .subissue-pill.active { background: #0284c7; color: #ffffff; border-color: #38bdf8; }
+    .recording-pulse { animation: pulseRed 1.5s infinite; }
+    @keyframes pulseRed {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
   </style>
 </head>
 <body class="min-h-screen pb-16">
@@ -36,13 +42,13 @@
         <span class="text-slate-300 font-medium" id="headerUserName"></span>
         <span class="inline-flex items-center px-3 py-1 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
           <span class="w-2 h-2 rounded-full bg-emerald-400 mr-2 animate-pulse"></span>
-          100% Direct Consumer Recovery (Zero Commission)
+          100% Direct Consumer Restitution (Zero Commission)
         </span>
       </div>
     </div>
   </header>
 
-  <!-- GATEWAY 1: CONSUMER AUTHENTICATION LOGIN PAGE -->
+  <!-- GATEWAY 1: CONSUMER AUTHENTICATION LOGIN -->
   <section id="authGatewaySection" class="max-w-md mx-auto px-6 pt-16 space-y-6">
     <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-8 shadow-2xl backdrop-blur space-y-6 text-center">
       <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center mx-auto shadow-lg shadow-sky-600/30">
@@ -72,12 +78,10 @@
           <i class="fa-solid fa-arrow-right text-xs"></i>
         </button>
       </form>
-
-      <p class="text-[11px] text-slate-400">Zero platform cuts &bull; Restitution is credited 100% to your UPI</p>
     </div>
   </section>
 
-  <!-- GATEWAY 2: MAIN DASHBOARD & INTAKE WORKSPACE -->
+  <!-- GATEWAY 2: MAIN DASHBOARD & WORKSPACE -->
   <main id="mainWorkspace" class="hidden max-w-6xl mx-auto px-6 pt-8 space-y-8">
 
     <!-- Top 3 Metrics -->
@@ -114,9 +118,7 @@
         </h2>
         <p class="text-xs text-slate-400 ml-8">Choose the commercial sector under which your grievance falls</p>
       </div>
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5" id="categoryGrid">
-        <!-- Rendered via JS -->
-      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3.5" id="categoryGrid"></div>
     </section>
 
     <!-- PARENT -> CHILD SUB-ISSUE SELECTOR -->
@@ -125,31 +127,42 @@
         <span class="w-6 h-6 rounded-md bg-sky-500/20 text-sky-400 flex items-center justify-center text-xs font-mono">2</span>
         <h3 class="text-sm font-semibold text-white">Specific Deficiency / Cause of Action:</h3>
       </div>
-      <div class="flex flex-wrap gap-2 pt-1" id="subIssuePills">
-        <!-- Pills injected via JS -->
-      </div>
+      <div class="flex flex-wrap gap-2 pt-1" id="subIssuePills"></div>
     </section>
 
-    <!-- CONVERSATIONAL NARRATIVE INTAKE -->
+    <!-- CONVERSATIONAL NARRATIVE + VOICE INPUT INTAKE -->
     <section id="intakeSection" class="hidden space-y-6">
       
       <div class="bg-slate-800/60 border border-slate-700 rounded-xl p-6 space-y-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-2">
             <span class="w-6 h-6 rounded-md bg-sky-500/20 text-sky-400 flex items-center justify-center text-xs font-mono">3</span>
-            <h3 class="text-base font-bold text-white">Tell Us What Happened</h3>
+            <h3 class="text-base font-bold text-white">Tell Us What Happened (Type or Speak)</h3>
           </div>
-          <span class="text-xs text-slate-400">English, Tanglish, or Hinglish accepted</span>
+          <!-- FEATURE #13: LIVE VOICE BUTTON -->
+          <button type="button" id="btnVoiceRecord" onclick="toggleVoiceRecording()" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sky-400 text-xs px-3.5 py-1.5 rounded-lg flex items-center space-x-2 transition">
+            <i class="fa-solid fa-microphone" id="micIcon"></i>
+            <span id="micText">Tap to Speak (Tamil / Tanglish / English)</span>
+          </button>
         </div>
 
         <textarea id="narrativeInput" rows="3" 
           placeholder="e.g. Movie stopped midway at Shanmuga Theatre due to power failure on 29-Oct, no refund given and I had to spend 500 for Rapido to return home..." 
           class="w-full bg-slate-900 border border-slate-700 rounded-lg p-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 transition"></textarea>
 
+        <!-- FEATURE #12: SOUL GATEKEEPER REJECTION WARNING BANNER -->
+        <div id="gatekeeperWarning" class="hidden p-4 rounded-xl bg-rose-950/40 border border-rose-500/60 text-rose-300 text-xs flex items-start space-x-3">
+          <i class="fa-solid fa-triangle-exclamation text-base mt-0.5 text-rose-400"></i>
+          <div>
+            <p class="font-bold text-white mb-0.5" id="gatekeeperTitle">Claim Ineligible Under Consumer Protection Rules</p>
+            <p id="gatekeeperMessage" class="leading-relaxed"></p>
+          </div>
+        </div>
+
         <div class="flex justify-end">
           <button id="btnAnalyze" onclick="analyzeGrievance()" class="bg-sky-600 hover:bg-sky-500 text-white font-semibold px-5 py-2.5 rounded-lg text-sm flex items-center space-x-2 transition shadow-lg shadow-sky-600/20">
             <i class="fa-solid fa-brain text-sky-200"></i>
-            <span>Analyze Grievance & Map Required Evidence</span>
+            <span>Analyze Grievance & Verify Legal Grounds</span>
           </button>
         </div>
       </div>
@@ -159,19 +172,19 @@
         
         <div class="flex items-center justify-between border-b border-slate-700/80 pb-4">
           <div>
-            <span class="text-xs font-mono text-sky-400 uppercase tracking-wider">Statutory Analysis Engine</span>
+            <span class="text-xs font-mono text-sky-400 uppercase tracking-wider">Statutory Merit Engine</span>
             <h4 class="text-base font-bold text-white mt-0.5" id="analysisEntityTitle">Analysis Complete</h4>
           </div>
           <span class="px-3 py-1 bg-emerald-950 text-emerald-400 border border-emerald-800 text-xs rounded-full font-mono">
-            Grounds for Relief Verified
+            Grounds for Relief Verified Under CPA 2019
           </span>
         </div>
 
-        <!-- VENUE & ENTITY DISAMBIGUATION (Shanmuga Theatre / Specific Branch fix) -->
+        <!-- VENUE DISAMBIGUATION -->
         <div id="disambiguationBlock" class="p-4 bg-amber-950/30 border border-amber-500/40 rounded-xl space-y-3">
           <div class="flex items-center space-x-2 text-amber-400 text-xs font-bold">
             <i class="fa-solid fa-location-crosshairs"></i>
-            <span>Confirm Specific Branch & Incident Venue (Prevents Notice Invalidation)</span>
+            <span>Confirm Specific Branch & Incident Venue</span>
           </div>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
             <div>
@@ -201,7 +214,7 @@
           </div>
         </div>
 
-        <!-- 3 DEDICATED EVIDENCE CARDS (PRIMARY BILL + INCIDENT PROOF + RAPIDO/CAB LOSS) -->
+        <!-- EVIDENCE UPLOADS -->
         <div class="space-y-3">
           <div class="flex items-center justify-between">
             <h5 class="text-sm font-semibold text-white flex items-center">
@@ -211,7 +224,6 @@
           </div>
           
           <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-            
             <!-- 1. Original Bill / Ticket -->
             <div class="bg-slate-900 border border-slate-700 rounded-lg p-4 flex flex-col justify-between space-y-3">
               <div>
@@ -241,7 +253,7 @@
                   <span class="text-xs font-bold text-white">2. Incident Proof</span>
                   <span class="text-[9px] px-2 py-0.5 rounded font-mono bg-amber-950 text-amber-300 border border-amber-800">Deficiency</span>
                 </div>
-                <p class="text-[11px] text-slate-400">Delay SMS, display photo, support rejection chat.</p>
+                <p class="text-[11px] text-slate-400">Delay SMS, display photo, support chat.</p>
               </div>
               <div class="space-y-2">
                 <div class="flex space-x-2">
@@ -256,14 +268,14 @@
               </div>
             </div>
 
-            <!-- 3. Consequential Expenses (Rapido / Cabs / Bus / Meals) -->
+            <!-- 3. Consequential Expenses (Rapido / Cabs / Meals) -->
             <div class="bg-slate-900 border border-emerald-500/40 rounded-lg p-4 flex flex-col justify-between space-y-3">
               <div>
                 <div class="flex justify-between items-center mb-1">
                   <span class="text-xs font-bold text-emerald-300">3. Consequential Loss</span>
                   <span class="text-[9px] px-2 py-0.5 rounded font-mono bg-emerald-950 text-emerald-300 border border-emerald-800">+ Claimable</span>
                 </div>
-                <p class="text-[11px] text-slate-400">Emergency Rapido/cab receipt, bus ticket or meal bill caused by delay.</p>
+                <p class="text-[11px] text-slate-400">Emergency Rapido/cab receipt or meal bill caused by delay.</p>
               </div>
               <div class="space-y-2">
                 <div class="flex space-x-2">
@@ -277,11 +289,10 @@
                 <div id="expenseStatus" class="text-[10px] text-emerald-400 font-mono truncate">No expense attached</div>
               </div>
             </div>
-
           </div>
         </div>
 
-        <!-- AUTO-SUMMED RESTITUTION BREAKDOWN (NO MANUAL AMOUNT TYPING) -->
+        <!-- AUTO-SUMMED RESTITUTION BREAKDOWN -->
         <div class="bg-slate-900/90 border border-slate-700 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
           <div class="space-y-1">
             <span class="text-slate-400">Statutory Restitution Computation:</span>
@@ -299,9 +310,8 @@
           </div>
         </div>
 
-        <!-- 1-CLICK SUBMISSION BUTTON -->
+        <!-- 1-CLICK NOTICE COMPILATION -->
         <form id="disputeForm" onsubmit="submitDispute(event)" class="pt-2">
-          <!-- Hidden inputs for automated values -->
           <input type="file" id="filePrimary" class="hidden">
           <input type="file" id="fileIncident" class="hidden">
           <input type="file" id="fileExpense" class="hidden">
@@ -323,7 +333,7 @@
 
     </section>
 
-    <!-- SUCCESS DOCKET MODAL -->
+    <!-- SUCCESS DOCKET + FEATURE #15 & #16 LIVE TRACKER -->
     <div id="successCard" class="hidden bg-slate-800 border border-emerald-500/60 rounded-xl p-8 space-y-6">
       <div class="text-center space-y-2">
         <div class="w-14 h-14 bg-emerald-950 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-2xl border border-emerald-500/40">
@@ -339,13 +349,35 @@
           <span class="text-emerald-400 font-bold text-sm" id="docketTotalDemand"></span>
         </div>
         <div class="flex justify-between">
-          <span class="text-slate-400">Section 65B Cryptographic Hash:</span>
+          <span class="text-slate-400">Section 65B Cryptographic Seal:</span>
           <span class="text-sky-400 truncate max-w-xs" id="docketHash"></span>
         </div>
         <div class="flex justify-between">
           <span class="text-slate-400">7-Day Cure Window Expiry:</span>
           <span class="text-amber-400 font-bold" id="docketDeadline"></span>
         </div>
+      </div>
+
+      <!-- FEATURE #16: ANTI-STALL LIVE REBUTTAL BOX -->
+      <div id="companyResponseAlert" class="hidden p-5 rounded-lg border border-amber-500/50 bg-amber-950/30 space-y-3">
+        <div class="flex items-center space-x-2 text-amber-400 text-xs font-bold">
+          <i class="fa-solid fa-envelope-open-text"></i>
+          <span>The Company Lodged a Written Response / Apology</span>
+        </div>
+        <div class="bg-slate-900 p-3 rounded text-xs text-slate-300 italic border border-slate-800" id="companyReplyContent"></div>
+        <div class="flex items-center justify-between pt-1">
+          <span class="text-[11px] text-slate-400">Did they fail to disburse compensation?</span>
+          <button onclick="escalateToNCH()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-4 py-2 rounded text-xs transition flex items-center space-x-1.5 shadow">
+            <i class="fa-solid fa-gavel"></i>
+            <span>Reject Excuse & File to NCH (INGRAM)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ESCALATED TO NCH CONFIRMATION BANNER -->
+      <div id="nchEscalatedBanner" class="hidden p-4 rounded-lg bg-emerald-950/60 border border-emerald-500/60 text-emerald-300 text-xs space-y-1">
+        <p class="font-bold flex items-center"><i class="fa-solid fa-check-double mr-1.5"></i> Escalated to National Consumer Helpline (INGRAM)</p>
+        <p class="text-[11px] text-slate-300" id="nchDocketIdText"></p>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -363,7 +395,6 @@
   </main>
 
   <script>
-    // 10 + 1 TAXONOMY CONFIGURATION
     const CATEGORIES = {
       aviation: {
         title: "Civil Aviation",
@@ -436,8 +467,10 @@
     let userSession = null;
     let selectedCategory = null;
     let selectedSubIssue = null;
+    let currentDisputeId = null;
+    let recognition = null;
+    let isRecording = false;
 
-    // Handle Login
     function handleLogin(e) {
       e.preventDefault();
       userSession = {
@@ -453,6 +486,7 @@
 
       renderCategories();
       captureBackgroundLocation();
+      initSpeechRecognition();
     }
 
     function renderCategories() {
@@ -509,27 +543,83 @@
       document.getElementById("intakeSection").classList.remove("hidden");
     }
 
+    // FEATURE #13: LIVE VOICE RECOGNITION (TAMIL / EN-IN / TANGLISH)
+    function initSpeechRecognition() {
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRec();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-IN'; // Robust support for Indian accents and Tanglish
+
+        recognition.onresult = (event) => {
+          let transcript = "";
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            transcript += event.results[i][0].transcript;
+          }
+          const box = document.getElementById("narrativeInput");
+          box.value = box.value ? box.value + " " + transcript : transcript;
+        };
+
+        recognition.onerror = () => stopRecordingUI();
+        recognition.onend = () => stopRecordingUI();
+      }
+    }
+
+    function toggleVoiceRecording() {
+      if (!recognition) {
+        alert("Speech Recognition is not supported on this browser. Please use Google Chrome.");
+        return;
+      }
+      if (!isRecording) {
+        try {
+          recognition.start();
+          isRecording = true;
+          const btn = document.getElementById("btnVoiceRecord");
+          btn.classList.add("recording-pulse", "border-rose-500", "text-rose-400");
+          document.getElementById("micIcon").className = "fa-solid fa-circle-dot text-rose-500 animate-pulse";
+          document.getElementById("micText").textContent = "Listening... Speak your story (Tap to stop)";
+        } catch (e) {}
+      } else {
+        recognition.stop();
+        stopRecordingUI();
+      }
+    }
+
+    function stopRecordingUI() {
+      isRecording = false;
+      const btn = document.getElementById("btnVoiceRecord");
+      btn.classList.remove("recording-pulse", "border-rose-500", "text-rose-400");
+      document.getElementById("micIcon").className = "fa-solid fa-microphone";
+      document.getElementById("micText").textContent = "Tap to Speak (Tamil / Tanglish / English)";
+    }
+
     function captureBackgroundLocation() {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           pos => {
             document.getElementById("gpsTelemetry").value = `${pos.coords.latitude.toFixed(4)}° N, ${pos.coords.longitude.toFixed(4)}° E`;
           },
-          () => {} // Silent failover
+          () => {}
         );
       }
     }
 
-    // AI Analysis + Bill & Expense Auto-Detection + Disambiguation
+    // FEATURE #12 & #14: STRICT AUDIT & VALIDATION
     async function analyzeGrievance() {
       const narrative = document.getElementById("narrativeInput").value.trim();
+      const warningBox = document.getElementById("gatekeeperWarning");
+      warningBox.classList.add("hidden");
+
       if (!narrative) {
-        alert("Please describe what occurred in the problem box.");
+        warningBox.classList.remove("hidden");
+        document.getElementById("gatekeeperTitle").textContent = "Narrative Required";
+        document.getElementById("gatekeeperMessage").textContent = "Please provide details of the incident or tap the mic to speak your grievance.";
         return;
       }
 
       const btn = document.getElementById("btnAnalyze");
-      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing Laws & Evidence...`;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Analyzing Rules & Evidence Grounds...`;
 
       try {
         const res = await fetch("/api/analyze-grievance", {
@@ -541,9 +631,19 @@
             narrative: narrative
           })
         });
+        
         const data = await res.json();
 
-        // Populate Brand & Disambiguation
+        // THE SOUL GATEKEEPER BLOCK
+        if (!res.ok || data.status === "rejected") {
+          document.getElementById("aiAnalysisCard").classList.add("hidden");
+          warningBox.classList.remove("hidden");
+          document.getElementById("gatekeeperTitle").textContent = "Claim Ineligible Under Statutory Rules";
+          document.getElementById("gatekeeperMessage").textContent = data.message || "This complaint cannot be processed under consumer law.";
+          return;
+        }
+
+        // APPROVED COMMERCIAL MERIT
         document.getElementById("analysisEntityTitle").textContent = `Commercial Party: ${data.detected_brand}`;
         document.getElementById("oppositeParty").value = data.detected_brand;
         document.getElementById("referenceId").value = data.detected_ref;
@@ -555,35 +655,34 @@
         }
         document.getElementById("targetDateSlot").value = `${new Date().toISOString().split("T")[0]}, Incident Slot`;
 
-        // Populate Laws & Violations
         document.getElementById("lawsList").innerHTML = data.applicable_laws.map(l => `<li>&bull; ${l}</li>`).join("");
         document.getElementById("violationsList").innerHTML = data.violations.map(v => `<li>&bull; ${v}</li>`).join("");
         document.getElementById("violationSummary").value = data.violations.join("; ");
         document.getElementById("statutoryPenalty").value = data.statutory_penalty;
 
-        // Auto-populate amounts parsed from story
         if (data.extracted_bill > 0) {
           document.getElementById("valPrimaryAmt").value = data.extracted_bill;
         } else {
-          document.getElementById("valPrimaryAmt").value = 450; // Sensible default based on category
+          document.getElementById("valPrimaryAmt").value = 450;
         }
 
         if (data.extracted_expense > 0) {
           document.getElementById("valExpenseAmt").value = data.extracted_expense;
-          document.getElementById("expenseStatus").textContent = `Auto-Detected: ₹${data.extracted_expense} (Rapido/Transport)`;
+          document.getElementById("expenseStatus").textContent = `Auto-Detected: ₹${data.extracted_expense} (Rapido/Travel)`;
         }
 
         recomputeTotals();
         document.getElementById("aiAnalysisCard").classList.remove("hidden");
 
       } catch (err) {
-        alert("Grievance analysis failed. Please try again.");
+        warningBox.classList.remove("hidden");
+        document.getElementById("gatekeeperTitle").textContent = "System Error";
+        document.getElementById("gatekeeperMessage").textContent = "Grievance analysis failed. Please verify your connection.";
       } finally {
         btn.innerHTML = `<i class="fa-solid fa-brain text-sky-200"></i> <span>Re-Analyze Grievance</span>`;
       }
     }
 
-    // Upload Handlers
     function triggerUpload(type, isCamera) {
       let inputId = type === 'primary' ? 'filePrimary' : (type === 'expense' ? 'fileExpense' : 'fileIncident');
       const input = document.getElementById(inputId);
@@ -604,7 +703,7 @@
             document.getElementById("valPrimaryAmt").value = 450;
           }
           if (type === 'expense' && parseFloat(document.getElementById("valExpenseAmt").value) === 0) {
-            document.getElementById("valExpenseAmt").value = 500; // Rapido auto-detect
+            document.getElementById("valExpenseAmt").value = 500;
           }
           recomputeTotals();
         }
@@ -625,7 +724,6 @@
       document.getElementById("lblTotalDemand").textContent = `₹${total.toLocaleString('en-IN')}`;
     }
 
-    // Submit Dispute
     async function submitDispute(e) {
       e.preventDefault();
       const btn = document.getElementById("btnSubmitNotice");
@@ -660,6 +758,12 @@
         });
         const result = await res.json();
 
+        if (!res.ok) {
+          alert("Submission Blocked: " + result.message);
+          return;
+        }
+
+        currentDisputeId = result.dispute_id;
         document.getElementById("docketSubtitle").textContent = `Action Docket: ${result.dispute_id}`;
         document.getElementById("docketTotalDemand").textContent = `₹ ${result.total_demand.toLocaleString('en-IN')}`;
         document.getElementById("docketHash").textContent = result.combined_hash;
@@ -672,13 +776,55 @@
         document.getElementById("successCard").classList.remove("hidden");
         document.getElementById("activeCounter").textContent = "1";
 
+        // Poll for corporate reply (Feature #15 & #16)
+        startStatusPolling(currentDisputeId);
+
         window.scrollTo({ top: document.getElementById("successCard").offsetTop - 50, behavior: 'smooth' });
 
       } catch (err) {
-        alert("Failed to compile pre-litigation docket.");
+        alert("Failed to compile legal notice.");
       } finally {
         btn.innerHTML = `<i class="fa-solid fa-file-shield text-base"></i> <span>Compile Certified Section 65B Legal Notice & Activate 7-Day Cure Window</span>`;
       }
+    }
+
+    // FEATURE #15 & #16: STATUS MONITOR & ANTI-STALL TRIGGER
+    let pollInterval = null;
+    function startStatusPolling(disputeId) {
+      if (pollInterval) clearInterval(pollInterval);
+      pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/dispute-status/${disputeId}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.status === 'COMPANY_REPLIED_UNSETTLED') {
+              document.getElementById("companyResponseAlert").classList.remove("hidden");
+              document.getElementById("companyReplyContent").textContent = `"${data.company_reply}" — ${data.company_officer} (${data.reply_timestamp})`;
+            } else if (data.status === 'SETTLED_PRE_LITIGATION') {
+              document.getElementById("companyResponseAlert").classList.add("hidden");
+              alert("🎉 Settlement Received! The Opposite Party has disbursed 100% of the claim via UPI.");
+              clearInterval(pollInterval);
+            }
+          }
+        } catch (e) {}
+      }, 5000);
+    }
+
+    // FEATURE #16: 1-CLICK NCH ESCALATION
+    async function escalateToNCH() {
+      if (!currentDisputeId) return;
+      const confirmed = confirm("Are you sure you want to reject their explanation? This will transmit the dispute bundle and their admission statement directly to the National Consumer Helpline (INGRAM).");
+      if (!confirmed) return;
+
+      const fd = new FormData();
+      fd.append("dispute_id", currentDisputeId);
+      const res = await fetch("/api/escalate-nch", { method: "POST", body: fd });
+      const data = await res.json();
+
+      document.getElementById("companyResponseAlert").classList.add("hidden");
+      const banner = document.getElementById("nchEscalatedBanner");
+      banner.classList.remove("hidden");
+      document.getElementById("nchDocketIdText").textContent = `Grievance registered under Docket Reference: ${data.nch_docket}. Government mediator assigned.`;
     }
   </script>
 </body>

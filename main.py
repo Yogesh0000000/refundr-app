@@ -3,19 +3,18 @@ import hashlib
 import sqlite3
 import re
 from datetime import datetime, timezone, timedelta
-from typing import Optional, List
-from fastapi import FastAPI, Request, Form, UploadFile, File
+from typing import Optional
+from fastapi import FastAPI, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from pydantic import BaseModel
 import io
 
-# ReportLab for Section 65B Certified Legal PDF Notices
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
-app = FastAPI(title="Refundr - Automated Statutory Consumer Escalation")
+app = FastAPI(title="Refundr - Automated Statutory Consumer Dispute & Escalation Engine")
 
 DB_FILE = "refundr.db"
 
@@ -48,7 +47,10 @@ def init_db():
             combined_hash TEXT,
             gps_coordinates TEXT,
             status TEXT,
-            cure_deadline TEXT
+            cure_deadline TEXT,
+            company_reply TEXT,
+            company_officer TEXT,
+            reply_timestamp TEXT
         )
     """)
     conn.commit()
@@ -56,7 +58,6 @@ def init_db():
 
 init_db()
 
-# --- KNOWN NODAL ENTITIES & CIN DIRECTORY ---
 KNOWN_ENTITIES = {
     "INDIGO": {
         "legal_name": "InterGlobe Aviation Limited (IndiGo)",
@@ -76,7 +77,7 @@ KNOWN_ENTITIES = {
         "legal_name": "Flipkart Internet Private Limited",
         "cin": "U51109KA2012PTC066107",
         "nodal_email": "grievance.officer@flipkart.com",
-        "address": "Buildings Alyssa, Begonia & Clover, Embassy Tech Village, Outer Ring Road, Bengaluru, Karnataka - 560103",
+        "address": "Buildings Alyssa, Begonia & Clover, Embassy Tech Village, Outer Ring Road, Bengaluru - 560103",
         "regulator": "Consumer Protection (E-Commerce) Rules, 2020"
     },
     "AMAZON": {
@@ -137,6 +138,49 @@ KNOWN_ENTITIES = {
     }
 }
 
+# --- THE SOUL RULE: STATUTORY MERIT & DECENCY ENGINE ---
+INAPPROPRIATE_PATTERNS = [
+    r"\bassault\b", r"\bpanties?\b", r"\bundies?\b", r"\bunderwear\b",
+    r"\brape\b", r"\bharass\b", r"\bmolest\b", r"\bweapon\b",
+    r"\bdrugs?\b", r"\bkill\b", r"\bextort\b", r"\bblackmail\b",
+    r"\bsex\b", r"\bnude\b", r"\bporn\b", r"\bidiot\b", r"\bbastard\b",
+    r"\bgirlfriend\b", r"\bboyfriend\b", r"\blover\b", r"\bcheat\b"
+]
+
+COMMERCIAL_ANCHORS = [
+    "ticket", "flight", "train", "bus", "cab", "ride", "auto", "order", "delivery",
+    "product", "item", "food", "meal", "bill", "invoice", "pnr", "booking", "refund",
+    "theatre", "theater", "cinema", "hotel", "store", "purchase", "bought", "charged",
+    "reversal", "upi", "bank", "account", "delay", "cancelled", "defective", "damaged",
+    "screen", "show", "fare", "fee", "power cut", "rapido", "uber", "ola", "flipkart",
+    "amazon", "swiggy", "zomato", "padam", "kaasu", "kudukala", "panam"
+]
+
+def audit_narrative_merit(narrative: str, category: str):
+    text = narrative.lower().strip()
+
+    if len(text) < 12:
+        return {
+            "valid": False,
+            "reason": "Grievance statement is too brief. Please explain the commercial transaction, date, and service failure."
+        }
+
+    for pattern in INAPPROPRIATE_PATTERNS:
+        if re.search(pattern, text):
+            return {
+                "valid": False,
+                "reason": "Submission Blocked: Inappropriate, offensive, or non-commercial content detected. Refundr strictly adjudicates civil consumer disputes under the Consumer Protection Act, 2019."
+            }
+
+    has_anchor = any(term in text for term in COMMERCIAL_ANCHORS)
+    if not has_anchor and category != "custom":
+        return {
+            "valid": False,
+            "reason": "Claim Ineligible: No verifiable consumer purchase, booking, or service deficiency detected. Legal pre-litigation notices cannot be generated for personal disputes or subjective opinions."
+        }
+
+    return {"valid": True, "reason": None}
+
 class AnalysisRequest(BaseModel):
     category: str
     sub_issue: str
@@ -144,31 +188,35 @@ class AnalysisRequest(BaseModel):
 
 @app.post("/api/analyze-grievance")
 async def analyze_grievance(req: AnalysisRequest):
+    audit = audit_narrative_merit(req.narrative, req.category)
+    if not audit["valid"]:
+        return JSONResponse(
+            status_code=400,
+            content={"status": "rejected", "message": audit["reason"]}
+        )
+
     text = req.narrative.lower()
     cat = req.category
-    
-    # 1. Detect Company / Brand
+
     detected_brand = None
     for brand in KNOWN_ENTITIES.keys():
         if brand.lower() in text:
             detected_brand = brand
             break
-            
-    # Fallback to local theater / store detection
+
     is_ambiguous_venue = False
     suggested_venues = []
-    
+
     if not detected_brand:
-        # Check if user mentioned theatre, cinema, store, branch, clinic, restaurant
         theater_match = re.search(r'([a-zA-Z0-9\s]+)\s+(theatre|theater|cinemas|talkies|store|bazaar|restaurant|hotel|hospital)', text)
         if theater_match:
             raw_entity = theater_match.group(0).strip().title()
             detected_brand = raw_entity
             is_ambiguous_venue = True
             suggested_venues = [
-                f"{raw_entity} - Chennai (Ambattur / Central)",
-                f"{raw_entity} - Coimbatore / Madurai",
-                f"{raw_entity} - Enter specific local branch address"
+                f"{raw_entity} - Chennai (Ambattur / Main Branch)",
+                f"{raw_entity} - Coimbatore / Madurai Branch",
+                f"{raw_entity} - Custom Area / City Branch"
             ]
         else:
             detected_brand = "Commercial Opposite Party"
@@ -178,10 +226,9 @@ async def analyze_grievance(req: AnalysisRequest):
         suggested_venues = [
             f"{detected_brand} Cinemas - Grand Mall / Express Avenue",
             f"{detected_brand} Cinemas - VR Mall / Phoenix Marketcity",
-            f"{detected_brand} Cinemas - Local City Mall Branch"
+            f"{detected_brand} Cinemas - Local Branch"
         ]
 
-    # 2. Extract Numbers & Amounts directly from narrative
     extracted_bill = 0.0
     bill_match = re.search(r'(?:ticket|bill|paid|fare|order|worth|amount|for)\s*(?:of|is|was)?\s*(?:rs\.?|inr|₹)?\s*(\d{2,6})', text)
     if bill_match:
@@ -192,13 +239,11 @@ async def analyze_grievance(req: AnalysisRequest):
     if expense_match:
         extracted_expense = float(expense_match.group(1))
 
-    # 3. Reference ID detection (e.g. 6E-204, PNR, Order ID)
     detected_ref = "PENDING_VERIFICATION"
     ref_match = re.search(r'([a-z0-9]{2,3}[-\s]?[0-9]{3,5}|pnr\s*[:#]?\s*[a-z0-9]+|order\s*[:#]?\s*[0-9]+)', text)
     if ref_match:
         detected_ref = ref_match.group(0).upper()
 
-    # 4. Legal Violations Mapping
     violations = []
     applicable_laws = []
     statutory_penalty = 0.0
@@ -255,7 +300,6 @@ async def analyze_grievance(req: AnalysisRequest):
         "nodal_info": nodal_info
     }
 
-# --- DISPUTE SUBMISSION & SECTION 65B EVIDENCE SEALING ---
 @app.post("/api/create-dispute")
 async def create_dispute(
     consumer_name: str = Form(...),
@@ -277,17 +321,18 @@ async def create_dispute(
     primary_file: Optional[UploadFile] = File(None),
     expense_file: Optional[UploadFile] = File(None)
 ):
+    audit = audit_narrative_merit(narrative, category)
+    if not audit["valid"]:
+        return JSONResponse(status_code=400, content={"status": "error", "message": audit["reason"]})
+
     dispute_id = f"REF-{datetime.now().strftime('%y%m%d')}-{os.urandom(3).hex().upper()}"
     created_at = datetime.now(timezone.utc).isoformat()
     cure_deadline = (datetime.now() + timedelta(days=7)).strftime("%d-%b-%Y")
 
-    # 1. Mathematical Statutory Claim Formula
-    # Total = Original Bill + Consequential Incidental Expenses + Statutory Penalty + 12% Interest
     out_of_pocket_loss = round(primary_bill_amount + incidental_expense_amount, 2)
     interest_amount = round(out_of_pocket_loss * 0.12 * (30 / 365), 2)
     total_demand = round(out_of_pocket_loss + statutory_penalty + interest_amount, 2)
 
-    # 2. Cryptographic SHA-256 Forensic Fingerprints for Section 65B
     primary_hash = "NOT_ATTACHED"
     if primary_file and primary_file.filename:
         b1 = await primary_file.read()
@@ -304,14 +349,14 @@ async def create_dispute(
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("""
-        INSERT INTO disputes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO disputes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         dispute_id, created_at, consumer_name, consumer_upi, consumer_phone,
         category, sub_issue, opposite_party, entity_branch, entity_address,
         reference_id, incident_date, primary_bill_amount, incidental_expense_amount,
         statutory_penalty, interest_amount, total_demand, narrative, legal_violations,
         primary_hash, expense_hash, combined_hash, gps_coordinates,
-        "ACTIVE_7_DAY_CURE_WINDOW", cure_deadline
+        "ACTIVE_7_DAY_CURE_WINDOW", cure_deadline, None, None, None
     ))
     conn.commit()
     conn.close()
@@ -326,7 +371,6 @@ async def create_dispute(
         "settle_url": f"/settle/{dispute_id}"
     })
 
-# --- PDF GENERATOR (SECTION 65B / SECTION 63 BSA CERTIFIED DEMAND NOTICE) ---
 @app.get("/notice/{dispute_id}.pdf")
 async def generate_legal_notice(dispute_id: str):
     conn = sqlite3.connect(DB_FILE)
@@ -344,7 +388,7 @@ async def generate_legal_notice(dispute_id: str):
         ref_id, inc_date, bill_amt, exp_amt,
         penalty, interest, total_demand,
         narrative, violations, p_hash, e_hash, c_hash,
-        gps_coords, status, cure_deadline
+        gps_coords, status, cure_deadline, c_reply, c_off, r_time
     ) = row
 
     buffer = io.BytesIO()
@@ -404,7 +448,7 @@ async def generate_legal_notice(dispute_id: str):
     elements.append(Spacer(1, 3))
     elements.append(Paragraph(
         f"The Complainant engaged with the Opposite Party on <b>{inc_date}</b> regarding <b>{category.upper()} &bull; {sub_issue}</b>. "
-        f"The Opposite Party breached its statutory service guarantees, leading to severe deficiency of service as narrated below:<br/><br/>"
+        f"The Opposite Party breached statutory service guarantees, leading to severe deficiency of service as narrated below:<br/><br/>"
         f"<i>\"{narrative}\"</i>", body
     ))
     elements.append(Spacer(1, 8))
@@ -415,7 +459,7 @@ async def generate_legal_notice(dispute_id: str):
         f"The Opposite Party's conduct directly contravenes:<br/>"
         f"• <b>{violations}</b><br/>"
         f"• Section 2(11) (Deficiency of Service) & Section 2(47) (Unfair Trade Practice) of the Consumer Protection Act, 2019.<br/>"
-        f"• The Opposite Party is put on notice that holding consumer funds without service delivery constitutes actionable default.",
+        f"• The Opposite Party is put on notice that withholding consumer funds without service delivery constitutes actionable default.",
         body
     ))
     elements.append(Spacer(1, 10))
@@ -461,10 +505,10 @@ async def generate_legal_notice(dispute_id: str):
     elements.append(Spacer(1, 3))
     elements.append(Paragraph(
         f"The Opposite Party is granted a <b>strict 7-day statutory cure window</b> expiring on <b>{cure_deadline}</b> to disburse the sum of "
-        f"<b>Rs. {total_demand:,.2f}</b> directly to the Complainant's UPI handle <b>{c_upi}</b> using the Corporate Settlement Portal at:<br/>"
+        f"<b>Rs. {total_demand:,.2f}</b> directly to the Complainant's UPI handle <b>{c_upi}</b> or lodge their formal written response at:<br/>"
         f"<b>https://refundr-app.onrender.com/settle/{d_id}</b><br/><br/>"
-        f"<b>Default Escalation:</b> Failing settlement before {cure_deadline}, this certified docket will be transmitted directly for "
-        f"formal registry filing before the competent District Consumer Disputes Redressal Commission (e-Daakhil Section 35 Petition) "
+        f"<b>Default Escalation:</b> Failing settlement or valid statutory defense before {cure_deadline}, this certified docket will be "
+        f"transmitted directly for formal filing before the competent District Consumer Disputes Redressal Commission (e-Daakhil Section 35 Petition) "
         f"and National Consumer Helpline Convergence (NCH 1915), seeking additional punitive damages of Rs. 25,000 for bad-faith litigation.",
         body
     ))
@@ -477,7 +521,7 @@ async def generate_legal_notice(dispute_id: str):
         headers={"Content-Disposition": f"inline; filename={dispute_id}_Statutory_Demand_Notice.pdf"}
     )
 
-# --- CORPORATE SETTLEMENT DESK (/settle/{id}) ---
+# --- CORPORATE ADJUDICATION & TWO-WAY DESK (/settle/{id}) ---
 @app.get("/settle/{dispute_id}", response_class=HTMLResponse)
 async def settle_portal(dispute_id: str):
     conn = sqlite3.connect(DB_FILE)
@@ -495,30 +539,42 @@ async def settle_portal(dispute_id: str):
         ref_id, inc_date, bill_amt, exp_amt,
         penalty, interest, total_demand,
         narrative, violations, p_hash, e_hash, c_hash,
-        gps_coords, status, cure_deadline
+        gps_coords, status, cure_deadline, c_reply, c_off, r_time
     ) = row
+
+    reply_block = ""
+    if c_reply:
+        reply_block = f"""
+        <div class="bg-amber-950/40 border border-amber-500/50 rounded-lg p-5 mb-6">
+          <p class="text-xs font-bold text-amber-400 mb-1">Company Statement Already on Record:</p>
+          <p class="text-xs text-slate-300 italic mb-2">"{c_reply}"</p>
+          <p class="text-[10px] text-slate-400 font-mono">Submitted by: {c_off} | Timestamp: {r_time}</p>
+        </div>
+        """
 
     html = f"""
     <!DOCTYPE html>
     <html lang="en">
     <head>
       <meta charset="UTF-8">
-      <title>Corporate Settlement Desk | {d_id}</title>
+      <title>Corporate Adjudication Portal | {d_id}</title>
       <script src="https://cdn.tailwindcss.com"></script>
     </head>
     <body class="bg-slate-900 text-slate-100 min-h-screen py-10 px-4">
-      <div class="max-w-2xl mx-auto bg-slate-800 border border-slate-700 rounded-xl p-8 shadow-2xl">
-        <div class="flex items-center justify-between border-b border-slate-700 pb-4 mb-6">
+      <div class="max-w-2xl mx-auto bg-slate-800 border border-slate-700 rounded-xl p-8 shadow-2xl space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-700 pb-4">
           <div>
-            <h1 class="text-xl font-bold text-amber-400">CORPORATE ADJUDICATION & DIRECT UPI SETTLEMENT</h1>
-            <p class="text-xs text-slate-400">Pre-Litigation Alternative Dispute Resolution Portal</p>
+            <h1 class="text-xl font-bold text-sky-400">CORPORATE ADJUDICATION DESK</h1>
+            <p class="text-xs text-slate-400">Pre-Litigation Two-Way Dispute Resolution</p>
           </div>
-          <span class="px-3 py-1 bg-red-950/80 border border-red-500/50 text-red-300 text-xs font-mono rounded-full animate-pulse">
+          <span class="px-3 py-1 bg-red-950/80 border border-red-500/50 text-red-300 text-xs font-mono rounded-full">
             Cure Deadline: {cure_deadline}
           </span>
         </div>
 
-        <div class="bg-slate-900/80 border border-slate-700 rounded-lg p-5 mb-6 space-y-3 text-sm">
+        {reply_block}
+
+        <div class="bg-slate-900/80 border border-slate-700 rounded-lg p-5 space-y-3 text-sm">
           <div class="flex justify-between">
             <span class="text-slate-400">Opposite Party & Venue:</span>
             <span class="font-bold text-white text-right">{opp_party} &bull; {branch}</span>
@@ -532,7 +588,7 @@ async def settle_portal(dispute_id: str):
             <span class="text-slate-200">{category.upper()} &bull; {sub_issue}</span>
           </div>
           <div class="flex justify-between">
-            <span class="text-slate-400">Transaction / PNR Ref:</span>
+            <span class="text-slate-400">Booking / PNR Ref:</span>
             <span class="font-mono text-cyan-400">{ref_id}</span>
           </div>
           <div class="border-t border-slate-800 pt-3">
@@ -541,36 +597,74 @@ async def settle_portal(dispute_id: str):
           </div>
         </div>
 
-        <div class="bg-emerald-950/40 border border-emerald-500/40 rounded-lg p-5 mb-6">
-          <div class="flex justify-between items-center mb-1">
-            <span class="text-sm font-semibold text-emerald-300">Total Statutory Claim (Zero Commission):</span>
-            <span class="text-2xl font-bold text-emerald-400">₹ {total_demand:,.2f}</span>
+        <!-- TWO ACTION TABS: DISBURSE VS EXPLANATION -->
+        <div class="border border-slate-700 rounded-xl p-5 bg-slate-900/40 space-y-4">
+          <h3 class="text-sm font-bold text-white">Select Corporate Action:</h3>
+
+          <!-- ACTION 1: DISBURSE VIA UPI -->
+          <div class="bg-emerald-950/30 border border-emerald-500/40 rounded-lg p-4 space-y-3">
+            <div class="flex justify-between items-center">
+              <span class="text-xs font-bold text-emerald-300 uppercase">Option 1: Disburse Direct UPI Settlement</span>
+              <span class="text-lg font-bold text-emerald-400 font-mono">₹ {total_demand:,.2f}</span>
+            </div>
+            <p class="text-[11px] text-slate-300">100% credited directly to consumer handle: <b class="text-white font-mono">{c_upi}</b></p>
+            
+            <form action="/api/settle-confirm" method="POST" class="space-y-3 pt-2">
+              <input type="hidden" name="dispute_id" value="{d_id}">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input type="text" name="officer_name" required placeholder="Authorised Officer Name" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+                <input type="text" name="txn_id" required placeholder="Bank UTR / UPI Ref ID" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs font-mono text-emerald-400 focus:outline-none focus:border-emerald-500">
+              </div>
+              <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded text-xs transition">
+                Disburse ₹{total_demand:,.2f} & Discharge Legal Liability
+              </button>
+            </form>
           </div>
-          <p class="text-xs text-emerald-200/70">100% Disbursed Directly to Consumer UPI &bull; Direct Discharge of Legal Liability</p>
+
+          <!-- ACTION 2: SUBMIT EXPLANATION / APOLOGY -->
+          <div class="bg-slate-800/80 border border-amber-500/40 rounded-lg p-4 space-y-3">
+            <span class="text-xs font-bold text-amber-300 uppercase">Option 2: Submit Written Explanation / Apology Statement</span>
+            <p class="text-[11px] text-slate-400">If your establishment cannot provide monetary reimbursement, provide an official statement on record.</p>
+
+            <form action="/api/company-reply" method="POST" class="space-y-3">
+              <input type="hidden" name="dispute_id" value="{d_id}">
+              <input type="text" name="officer_name" required placeholder="Designation & Officer Name (e.g. Legal Counsel, PVR INOX)" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400">
+              <textarea name="reply_statement" rows="3" required placeholder="e.g. We acknowledge the disruption and express sincere apologies. While monetary refund is outside policy, complimentary passes are offered..." class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-400"></textarea>
+              <button type="submit" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-2.5 px-4 rounded text-xs transition">
+                Lodge Formal Statement on Record
+              </button>
+            </form>
+          </div>
         </div>
 
-        <form action="/api/settle-confirm" method="POST" class="space-y-4">
-          <input type="hidden" name="dispute_id" value="{d_id}">
-          <div>
-            <label class="block text-xs font-medium text-slate-300 mb-1">Authorised Legal / Compliance Officer Name</label>
-            <input type="text" name="officer_name" required placeholder="e.g. Legal Counsel / Nodal Manager" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400">
-          </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-300 mb-1">Settlement Bank UTR / UPI Transaction Reference</label>
-            <input type="text" name="txn_id" required placeholder="12-digit UTR or Payment Ref" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm font-mono text-emerald-400 focus:outline-none focus:border-emerald-500">
-          </div>
-          <div class="pt-3">
-            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-lg text-sm transition">
-              Disburse ₹{total_demand:,.2f} to {c_upi} & Discharge Liability
-            </button>
-            <p class="text-center text-[11px] text-slate-500 mt-2">Disbursement closes pre-litigation liability under Section 39 CPA, 2019.</p>
-          </div>
-        </form>
       </div>
     </body>
     </html>
     """
     return HTMLResponse(html)
+
+@app.post("/api/company-reply")
+async def handle_company_reply(dispute_id: str = Form(...), officer_name: str = Form(...), reply_statement: str = Form(...)):
+    now_str = datetime.now().strftime("%d-%b-%Y %H:%M")
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("""
+        UPDATE disputes 
+        SET company_reply = ?, company_officer = ?, reply_timestamp = ?, status = 'COMPANY_REPLIED_UNSETTLED'
+        WHERE id = ?
+    """, (reply_statement, officer_name, now_str, dispute_id))
+    conn.commit()
+    conn.close()
+
+    return HTMLResponse(f"""
+      <body style="background:#0f172a;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;">
+        <div style="text-align:center;background:#1e293b;padding:35px;border-radius:12px;border:1px solid #f59e0b;max-width:480px;">
+          <h2 style="color:#fbbf24;font-size:18px;margin-bottom:10px;">Corporate Statement Lodged</h2>
+          <p style="font-size:13px;color:#cbd5e1;line-height:1.6;">Your statement has been transmitted to the Complainant dashboard.<br/>The consumer may accept or elect to route this docket to the National Consumer Helpline (NCH).</p>
+          <a href="/settle/{dispute_id}" style="display:inline-block;margin-top:15px;color:#38bdf8;text-decoration:none;font-size:12px;">Review Docket &rarr;</a>
+        </div>
+      </body>
+    """)
 
 @app.post("/api/settle-confirm")
 async def settle_confirm(dispute_id: str = Form(...), txn_id: str = Form(...), officer_name: str = Form(...)):
@@ -590,7 +684,39 @@ async def settle_confirm(dispute_id: str = Form(...), txn_id: str = Form(...), o
       </body>
     """)
 
-# Serve Frontend
+@app.get("/api/dispute-status/{dispute_id}")
+async def check_dispute_status(dispute_id: str):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT status, company_reply, company_officer, reply_timestamp, total_demand, opposite_party FROM disputes WHERE id = ?", (dispute_id,))
+    row = c.fetchone()
+    conn.close()
+    if not row:
+        return JSONResponse({"status": "NOT_FOUND"}, status_code=404)
+    return {
+        "status": row[0],
+        "company_reply": row[1],
+        "company_officer": row[2],
+        "reply_timestamp": row[3],
+        "total_demand": row[4],
+        "opposite_party": row[5]
+    }
+
+@app.post("/api/escalate-nch")
+async def escalate_to_nch(dispute_id: str = Form(...)):
+    nch_ticket = f"NCH-{datetime.now().strftime('%y%m%d')}-{os.urandom(2).hex().upper()}"
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("UPDATE disputes SET status = 'ESCALATED_NCH_GOVERNMENT' WHERE id = ?", (dispute_id,))
+    conn.commit()
+    conn.close()
+
+    return JSONResponse({
+        "status": "success",
+        "nch_docket": nch_ticket,
+        "message": "Docket escalated to Central Consumer Helpline (INGRAM). Opposite Party's written statement has been attached as Exhibit A (Admission of Fact)."
+    })
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
     with open("index.html", "r", encoding="utf-8") as f:
